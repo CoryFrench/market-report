@@ -4,7 +4,7 @@ import Header from './components/Header';
 import FeaturedProperty from './components/FeaturedProperty';
 import PropertyTable from './components/PropertyTable';
 
-const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://localhost:3001/api';
+const API_BASE_URL = process.env.REACT_APP_API_BASE_URL ? process.env.REACT_APP_API_BASE_URL + '/api' : 'http://localhost:3001/api';
 
 function App() {
   const [activeArea, setActiveArea] = useState('Jupiter');

@@ -9,12 +9,13 @@ ARG REACT_APP_API_BASE_URL=/market-report
 
 # Set environment variables for build
 ENV REACT_APP_API_BASE_URL=$REACT_APP_API_BASE_URL
+ENV PUBLIC_URL=/market-report
 
 # Copy package files
 COPY package*.json ./
 
 # Install dependencies (including dev dependencies for build)
-RUN npm ci
+RUN npm install
 
 # Copy source code
 COPY . .
