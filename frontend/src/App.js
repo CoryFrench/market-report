@@ -154,7 +154,7 @@ function App() {
         onCityChange={setActiveCity}
       />
       
-      <main className="max-w-7xl mx-auto px-4 py-8">
+      <main className="max-w-7xl mx-auto px-3 sm:px-4 py-4 sm:py-8">
         <Dashboard 
           area={activeCity}
           marketStats={marketStats}
@@ -169,7 +169,7 @@ function App() {
           <FeaturedProperty property={featuredProperty} />
         )}
         
-        <div className="mt-8 space-y-8">
+        <div className="mt-4 sm:mt-8 space-y-4 sm:space-y-8">
           <PropertyTable 
             title="Homes Sold in the Past 30 Days" 
             properties={recentSales}
