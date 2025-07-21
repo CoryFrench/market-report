@@ -593,28 +593,37 @@ class DatabaseService {
         throw new Error(`Unsupported filter type: ${filterType}`);
     }
 
-    // For development data fields
-    query = `
-      SELECT DISTINCT ${fieldName} as name, COUNT(*) as property_count
-      FROM waterfrontdata.development_data dd
-      INNER JOIN mls.beaches_residential mls ON (
-        CASE 
-          WHEN mls.parcel_id IS NOT NULL AND mls.parcel_id != '' 
-          THEN mls.parcel_id = dd.parcel_number
-          ELSE UPPER(TRIM(mls.street_number || ' ' || mls.street_name)) = UPPER(TRIM(dd.property_address_line_1))
-        END
-      )
-      WHERE ${fieldName} IS NOT NULL AND ${fieldName} != ''
-      GROUP BY ${fieldName}
-      ORDER BY property_count DESC
-      LIMIT 50
-    `;
+    // First, try a simple query to see if the development data table exists and has data
+    try {
+      query = `
+        SELECT DISTINCT ${fieldName} as name, COUNT(*) as property_count
+        FROM waterfrontdata.development_data
+        WHERE ${fieldName} IS NOT NULL AND ${fieldName} != ''
+        GROUP BY ${fieldName}
+        ORDER BY property_count DESC
+        LIMIT 50
+      `;
 
-    const result = await this.query(query);
-    return result.rows.map(row => ({
-      name: row.name,
-      count: parseInt(row.property_count) || 0
-    }));
+      const result = await this.query(query);
+      return result.rows.map(row => ({
+        name: row.name,
+        count: parseInt(row.property_count) || 0
+      }));
+      
+    } catch (error) {
+      console.error(`Error fetching ${filterType} values:`, error.message);
+      
+      // If the table doesn't exist or has issues, return empty array
+      if (error.message.includes('does not exist') || 
+          error.message.includes('column') || 
+          error.message.includes('relation')) {
+        console.log(`⚠️  Development data table or column ${fieldName} not available`);
+        return [];
+      }
+      
+      // Re-throw other errors
+      throw error;
+    }
   }
 
   // ========== LEGACY AREA-BASED METHODS (for backwards compatibility) ==========
