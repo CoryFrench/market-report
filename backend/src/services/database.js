@@ -220,7 +220,7 @@ class DatabaseService {
     if (filters.city) {
       paramCount++;
       whereClause += ` AND mls.city = $${paramCount}`;
-      params.push(filters.city);
+      params.push(this.getCityFilter(filters.city));
     }
 
     // Handle waterfront filtering
