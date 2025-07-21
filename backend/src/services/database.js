@@ -252,20 +252,20 @@ class DatabaseService {
   // Get active listings for a specific area profile
   async getActiveListingsForArea(areaId, limit = 50, minPrice = null, maxPrice = null) {
     const areaQuery = this.buildAreaQuery(areaId);
-    let whereClause = "AND mls.status = 'Active'" + areaQuery.whereClause;
+    let additionalWhere = "";
     let params = [...areaQuery.params];
     let paramCount = areaQuery.paramCount;
 
     // Add user-specified price filtering on top of area filtering
     if (minPrice) {
       paramCount++;
-      whereClause += ` AND mls.list_price IS NOT NULL AND mls.list_price != '' AND mls.list_price::numeric >= $${paramCount}`;
+      additionalWhere += ` AND mls.list_price IS NOT NULL AND mls.list_price != '' AND mls.list_price::numeric >= $${paramCount}`;
       params.push(minPrice);
     }
 
     if (maxPrice) {
       paramCount++;
-      whereClause += ` AND mls.list_price IS NOT NULL AND mls.list_price != '' AND mls.list_price::numeric <= $${paramCount}`;
+      additionalWhere += ` AND mls.list_price IS NOT NULL AND mls.list_price != '' AND mls.list_price::numeric <= $${paramCount}`;
       params.push(maxPrice);
     }
 
@@ -279,10 +279,13 @@ class DatabaseService {
                ) as rn
         FROM mls.beaches_residential mls
         ${areaQuery.joinClause}
-        WHERE mls.listing_id IS NOT NULL
+        WHERE mls.listing_id IS NOT NULL 
+          AND mls.status = 'Active'
+          ${areaQuery.whereClause}
+          ${additionalWhere}
       )
       SELECT * FROM latest_listings 
-      WHERE rn = 1 ${whereClause}
+      WHERE rn = 1
       ORDER BY ${this.castDate('listing_date')} DESC NULLS LAST
       LIMIT $${paramCount}
     `;
@@ -295,20 +298,20 @@ class DatabaseService {
   // Get recent sales for a specific area profile  
   async getRecentSalesForArea(areaId, limit = 50, minPrice = null, maxPrice = null) {
     const areaQuery = this.buildAreaQuery(areaId);
-    let whereClause = `AND mls.status = 'Closed' AND ${this.castDate('sold_date')} >= CURRENT_DATE - INTERVAL '30 days'` + areaQuery.whereClause;
+    let additionalWhere = "";
     let params = [...areaQuery.params];
     let paramCount = areaQuery.paramCount;
 
     // Add user-specified price filtering (on sold price for sales)
     if (minPrice) {
       paramCount++;
-      whereClause += ` AND mls.sold_price IS NOT NULL AND mls.sold_price != '' AND mls.sold_price::numeric >= $${paramCount}`;
+      additionalWhere += ` AND mls.sold_price IS NOT NULL AND mls.sold_price != '' AND mls.sold_price::numeric >= $${paramCount}`;
       params.push(minPrice);
     }
 
     if (maxPrice) {
       paramCount++;
-      whereClause += ` AND mls.sold_price IS NOT NULL AND mls.sold_price != '' AND mls.sold_price::numeric <= $${paramCount}`;
+      additionalWhere += ` AND mls.sold_price IS NOT NULL AND mls.sold_price != '' AND mls.sold_price::numeric <= $${paramCount}`;
       params.push(maxPrice);
     }
 
@@ -323,9 +326,13 @@ class DatabaseService {
         FROM mls.beaches_residential mls
         ${areaQuery.joinClause}
         WHERE mls.listing_id IS NOT NULL
+          AND mls.status = 'Closed' 
+          AND ${this.castDate('sold_date')} >= CURRENT_DATE - INTERVAL '30 days'
+          ${areaQuery.whereClause}
+          ${additionalWhere}
       )
       SELECT * FROM latest_listings 
-      WHERE rn = 1 ${whereClause}
+      WHERE rn = 1
       ORDER BY ${this.castDate('sold_date')} DESC NULLS LAST
       LIMIT $${paramCount}
     `;
@@ -482,7 +489,6 @@ class DatabaseService {
   // Get market statistics for a specific area profile
   async getMarketStatsForArea(areaId, minPrice = null, maxPrice = null) {
     const areaQuery = this.buildAreaQuery(areaId);
-    let whereClause = areaQuery.whereClause;
     let params = [...areaQuery.params];
     let paramCount = areaQuery.paramCount;
 
@@ -530,6 +536,8 @@ class DatabaseService {
         FROM mls.beaches_residential mls
         ${areaQuery.joinClause}
         WHERE mls.listing_id IS NOT NULL
+          ${areaQuery.whereClause}
+          ${priceFilterClause}
       ),
       calculated_stats AS (
         SELECT *,
@@ -543,7 +551,7 @@ class DatabaseService {
                  ELSE NULL
                END as calculated_days_on_market
         FROM latest_listings 
-        WHERE rn = 1 ${whereClause}${priceFilterClause}
+        WHERE rn = 1
       )
       SELECT 
         COUNT(CASE WHEN status = 'Active' THEN 1 END) as active_listings,
@@ -580,19 +588,19 @@ class DatabaseService {
   // Get under contract properties for a specific area profile
   async getUnderContractForArea(areaId, limit = 50, minPrice = null, maxPrice = null) {
     const areaQuery = this.buildAreaQuery(areaId);
-    let whereClause = "AND mls.status IN ('Active Under Contract', 'Pending')" + areaQuery.whereClause;
+    let additionalWhere = "";
     let params = [...areaQuery.params];
     let paramCount = areaQuery.paramCount;
 
     if (minPrice) {
       paramCount++;
-      whereClause += ` AND mls.list_price IS NOT NULL AND mls.list_price != '' AND mls.list_price::numeric >= $${paramCount}`;
+      additionalWhere += ` AND mls.list_price IS NOT NULL AND mls.list_price != '' AND mls.list_price::numeric >= $${paramCount}`;
       params.push(minPrice);
     }
 
     if (maxPrice) {
       paramCount++;
-      whereClause += ` AND mls.list_price IS NOT NULL AND mls.list_price != '' AND mls.list_price::numeric <= $${paramCount}`;
+      additionalWhere += ` AND mls.list_price IS NOT NULL AND mls.list_price != '' AND mls.list_price::numeric <= $${paramCount}`;
       params.push(maxPrice);
     }
 
@@ -607,9 +615,12 @@ class DatabaseService {
         FROM mls.beaches_residential mls
         ${areaQuery.joinClause}
         WHERE mls.listing_id IS NOT NULL
+          AND mls.status IN ('Active Under Contract', 'Pending')
+          ${areaQuery.whereClause}
+          ${additionalWhere}
       )
       SELECT * FROM latest_listings 
-      WHERE rn = 1 ${whereClause}
+      WHERE rn = 1
       ORDER BY ${this.castDate('under_contract_date')} DESC NULLS LAST
       LIMIT $${paramCount}
     `;
@@ -622,19 +633,19 @@ class DatabaseService {
   // Get coming soon properties for a specific area profile
   async getComingSoonForArea(areaId, limit = 50, minPrice = null, maxPrice = null) {
     const areaQuery = this.buildAreaQuery(areaId);
-    let whereClause = "AND mls.status = 'Coming Soon'" + areaQuery.whereClause;
+    let additionalWhere = "";
     let params = [...areaQuery.params];
     let paramCount = areaQuery.paramCount;
 
     if (minPrice) {
       paramCount++;
-      whereClause += ` AND mls.list_price IS NOT NULL AND mls.list_price != '' AND mls.list_price::numeric >= $${paramCount}`;
+      additionalWhere += ` AND mls.list_price IS NOT NULL AND mls.list_price != '' AND mls.list_price::numeric >= $${paramCount}`;
       params.push(minPrice);
     }
 
     if (maxPrice) {
       paramCount++;
-      whereClause += ` AND mls.list_price IS NOT NULL AND mls.list_price != '' AND mls.list_price::numeric <= $${paramCount}`;
+      additionalWhere += ` AND mls.list_price IS NOT NULL AND mls.list_price != '' AND mls.list_price::numeric <= $${paramCount}`;
       params.push(maxPrice);
     }
 
@@ -649,9 +660,12 @@ class DatabaseService {
         FROM mls.beaches_residential mls
         ${areaQuery.joinClause}
         WHERE mls.listing_id IS NOT NULL
+          AND mls.status = 'Coming Soon'
+          ${areaQuery.whereClause}
+          ${additionalWhere}
       )
       SELECT * FROM latest_listings 
-      WHERE rn = 1 ${whereClause}
+      WHERE rn = 1
       ORDER BY ${this.castDate('listing_date')} DESC NULLS LAST
       LIMIT $${paramCount}
     `;
@@ -664,25 +678,19 @@ class DatabaseService {
   // Get price changes for a specific area profile
   async getPriceChangesForArea(areaId, limit = 50, minPrice = null, maxPrice = null) {
     const areaQuery = this.buildAreaQuery(areaId);
-    let whereClause = `
-      AND mls.status = 'Active' 
-      AND ${this.castTimestamp('price_change_timestamp')} >= CURRENT_DATE - INTERVAL '30 days'
-      AND mls.prior_list_price IS NOT NULL 
-      AND mls.prior_list_price != ''
-      AND mls.prior_list_price != mls.list_price
-    ` + areaQuery.whereClause;
+    let additionalWhere = "";
     let params = [...areaQuery.params];
     let paramCount = areaQuery.paramCount;
 
     if (minPrice) {
       paramCount++;
-      whereClause += ` AND mls.list_price IS NOT NULL AND mls.list_price != '' AND mls.list_price::numeric >= $${paramCount}`;
+      additionalWhere += ` AND mls.list_price IS NOT NULL AND mls.list_price != '' AND mls.list_price::numeric >= $${paramCount}`;
       params.push(minPrice);
     }
 
     if (maxPrice) {
       paramCount++;
-      whereClause += ` AND mls.list_price IS NOT NULL AND mls.list_price != '' AND mls.list_price::numeric <= $${paramCount}`;
+      additionalWhere += ` AND mls.list_price IS NOT NULL AND mls.list_price != '' AND mls.list_price::numeric <= $${paramCount}`;
       params.push(maxPrice);
     }
 
@@ -697,12 +705,19 @@ class DatabaseService {
         FROM mls.beaches_residential mls
         ${areaQuery.joinClause}
         WHERE mls.listing_id IS NOT NULL
+          AND mls.status = 'Active' 
+          AND ${this.castTimestamp('price_change_timestamp')} >= CURRENT_DATE - INTERVAL '30 days'
+          AND mls.prior_list_price IS NOT NULL 
+          AND mls.prior_list_price != ''
+          AND mls.prior_list_price != mls.list_price
+          ${areaQuery.whereClause}
+          ${additionalWhere}
       )
       SELECT *, 
              prior_list_price as previousPrice, 
              list_price as currentPrice
       FROM latest_listings 
-      WHERE rn = 1 ${whereClause}
+      WHERE rn = 1
       ORDER BY ${this.castTimestamp('price_change_timestamp')} DESC NULLS LAST
       LIMIT $${paramCount}
     `;
