@@ -150,14 +150,24 @@ class DatabaseService {
   }
 
   // Get active listings
-  async getActiveListings(area = null, limit = 50) {
+  async getActiveListings(area = null, limit = 50, minPrice = null, maxPrice = null) {
     let whereClause = "AND status = 'Active'";
     let params = [];
 
     if (area && area !== 'all') {
       const cityFilter = this.getAreaFilter(area);
-      whereClause += ` AND city = $1`;
+      whereClause += ` AND city = $${params.length + 1}`;
       params.push(cityFilter);
+    }
+
+    if (minPrice) {
+      whereClause += ` AND list_price IS NOT NULL AND list_price != '' AND list_price::numeric >= $${params.length + 1}`;
+      params.push(minPrice);
+    }
+
+    if (maxPrice) {
+      whereClause += ` AND list_price IS NOT NULL AND list_price != '' AND list_price::numeric <= $${params.length + 1}`;
+      params.push(maxPrice);
     }
 
     const query = `
@@ -182,14 +192,24 @@ class DatabaseService {
   }
 
   // Get recent sales (last 30 days)
-  async getRecentSales(area = null, limit = 50) {
+  async getRecentSales(area = null, limit = 50, minPrice = null, maxPrice = null) {
     let whereClause = `AND status = 'Closed' AND ${this.castDate('sold_date')} >= CURRENT_DATE - INTERVAL '30 days'`;
     let params = [];
 
     if (area && area !== 'all') {
       const cityFilter = this.getAreaFilter(area);
-      whereClause += ` AND city = $1`;
+      whereClause += ` AND city = $${params.length + 1}`;
       params.push(cityFilter);
+    }
+
+    if (minPrice) {
+      whereClause += ` AND sold_price IS NOT NULL AND sold_price != '' AND sold_price::numeric >= $${params.length + 1}`;
+      params.push(minPrice);
+    }
+
+    if (maxPrice) {
+      whereClause += ` AND sold_price IS NOT NULL AND sold_price != '' AND sold_price::numeric <= $${params.length + 1}`;
+      params.push(maxPrice);
     }
 
     const query = `
@@ -214,14 +234,24 @@ class DatabaseService {
   }
 
   // Get under contract properties
-  async getUnderContract(area = null, limit = 50) {
+  async getUnderContract(area = null, limit = 50, minPrice = null, maxPrice = null) {
     let whereClause = "AND status IN ('Active Under Contract', 'Pending')";
     let params = [];
 
     if (area && area !== 'all') {
       const cityFilter = this.getAreaFilter(area);
-      whereClause += ` AND city = $1`;
+      whereClause += ` AND city = $${params.length + 1}`;
       params.push(cityFilter);
+    }
+
+    if (minPrice) {
+      whereClause += ` AND list_price IS NOT NULL AND list_price != '' AND list_price::numeric >= $${params.length + 1}`;
+      params.push(minPrice);
+    }
+
+    if (maxPrice) {
+      whereClause += ` AND list_price IS NOT NULL AND list_price != '' AND list_price::numeric <= $${params.length + 1}`;
+      params.push(maxPrice);
     }
 
     const query = `
@@ -246,14 +276,24 @@ class DatabaseService {
   }
 
   // Get coming soon properties
-  async getComingSoon(area = null, limit = 50) {
+  async getComingSoon(area = null, limit = 50, minPrice = null, maxPrice = null) {
     let whereClause = "AND status = 'Coming Soon'";
     let params = [];
 
     if (area && area !== 'all') {
       const cityFilter = this.getAreaFilter(area);
-      whereClause += ` AND city = $1`;
+      whereClause += ` AND city = $${params.length + 1}`;
       params.push(cityFilter);
+    }
+
+    if (minPrice) {
+      whereClause += ` AND list_price IS NOT NULL AND list_price != '' AND list_price::numeric >= $${params.length + 1}`;
+      params.push(minPrice);
+    }
+
+    if (maxPrice) {
+      whereClause += ` AND list_price IS NOT NULL AND list_price != '' AND list_price::numeric <= $${params.length + 1}`;
+      params.push(maxPrice);
     }
 
     const query = `
@@ -278,7 +318,7 @@ class DatabaseService {
   }
 
   // Get price changes (last 30 days)
-  async getPriceChanges(area = null, limit = 50) {
+  async getPriceChanges(area = null, limit = 50, minPrice = null, maxPrice = null) {
     let whereClause = `
       AND status = 'Active' 
       AND ${this.castTimestamp('price_change_timestamp')} >= CURRENT_DATE - INTERVAL '30 days'
@@ -290,8 +330,18 @@ class DatabaseService {
 
     if (area && area !== 'all') {
       const cityFilter = this.getAreaFilter(area);
-      whereClause += ` AND city = $1`;
+      whereClause += ` AND city = $${params.length + 1}`;
       params.push(cityFilter);
+    }
+
+    if (minPrice) {
+      whereClause += ` AND list_price IS NOT NULL AND list_price != '' AND list_price::numeric >= $${params.length + 1}`;
+      params.push(minPrice);
+    }
+
+    if (maxPrice) {
+      whereClause += ` AND list_price IS NOT NULL AND list_price != '' AND list_price::numeric <= $${params.length + 1}`;
+      params.push(maxPrice);
     }
 
     const query = `
@@ -328,14 +378,44 @@ class DatabaseService {
   }
 
   // Get market statistics
-  async getMarketStats(area = null) {
+  async getMarketStats(area = null, minPrice = null, maxPrice = null) {
     let whereClause = "";
     let params = [];
 
     if (area && area !== 'all') {
       const cityFilter = this.getAreaFilter(area);
-      whereClause = "AND city = $1";
+      whereClause += ` AND city = $${params.length + 1}`;
       params.push(cityFilter);
+    }
+
+    // Price filtering for different statuses - we need to handle both list_price and sold_price
+    let priceFilterClause = "";
+    if (minPrice || maxPrice) {
+      let priceConditions = [];
+      
+      if (minPrice && maxPrice) {
+        priceConditions.push(`(
+          (status IN ('Active', 'Active Under Contract', 'Pending', 'Coming Soon') AND list_price IS NOT NULL AND list_price != '' AND list_price::numeric BETWEEN $${params.length + 1} AND $${params.length + 2}) OR
+          (status = 'Closed' AND sold_price IS NOT NULL AND sold_price != '' AND sold_price::numeric BETWEEN $${params.length + 1} AND $${params.length + 2})
+        )`);
+        params.push(minPrice, maxPrice);
+      } else if (minPrice) {
+        priceConditions.push(`(
+          (status IN ('Active', 'Active Under Contract', 'Pending', 'Coming Soon') AND list_price IS NOT NULL AND list_price != '' AND list_price::numeric >= $${params.length + 1}) OR
+          (status = 'Closed' AND sold_price IS NOT NULL AND sold_price != '' AND sold_price::numeric >= $${params.length + 1})
+        )`);
+        params.push(minPrice);
+      } else if (maxPrice) {
+        priceConditions.push(`(
+          (status IN ('Active', 'Active Under Contract', 'Pending', 'Coming Soon') AND list_price IS NOT NULL AND list_price != '' AND list_price::numeric <= $${params.length + 1}) OR
+          (status = 'Closed' AND sold_price IS NOT NULL AND sold_price != '' AND sold_price::numeric <= $${params.length + 1})
+        )`);
+        params.push(maxPrice);
+      }
+      
+      if (priceConditions.length > 0) {
+        priceFilterClause = " AND " + priceConditions.join(" AND ");
+      }
     }
 
     const query = `
@@ -360,7 +440,7 @@ class DatabaseService {
                  ELSE NULL
                END as calculated_days_on_market
         FROM latest_listings 
-        WHERE rn = 1 ${whereClause}
+        WHERE rn = 1 ${whereClause}${priceFilterClause}
       )
       SELECT 
         COUNT(CASE WHEN status = 'Active' THEN 1 END) as active_listings,

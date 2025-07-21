@@ -8,6 +8,7 @@ const API_BASE_URL = process.env.REACT_APP_API_BASE_URL ? process.env.REACT_APP_
 
 function App() {
   const [activeCity, setActiveCity] = useState('Jupiter');
+  const [activePriceRange, setActivePriceRange] = useState('1m-plus'); // Default to $1M+
   const [cities, setCities] = useState([]);
   const [marketStats, setMarketStats] = useState({});
   const [recentSales, setRecentSales] = useState([]);
@@ -17,6 +18,28 @@ function App() {
   const [priceChanges, setPriceChanges] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+
+  // Convert price range to API parameters
+  const getPriceRangeParams = (priceRange) => {
+    switch (priceRange) {
+      case 'all':
+        return {};
+      case 'under-500k':
+        return { maxPrice: 500000 };
+      case '500k-plus':
+        return { minPrice: 500000 };
+      case '1m-plus':
+        return { minPrice: 1000000 };
+      case '3m-plus':
+        return { minPrice: 3000000 };
+      case '5m-plus':
+        return { minPrice: 5000000 };
+      case '10m-plus':
+        return { minPrice: 10000000 };
+      default:
+        return {};
+    }
+  };
 
   // Fetch available cities from the API
   const fetchCities = async () => {
@@ -48,13 +71,24 @@ function App() {
     }
   };
 
-  // Fetch all data for the selected city
-  const fetchData = async (city) => {
+  // Fetch all data for the selected city and price range
+  const fetchData = async (city, priceRange) => {
     try {
       setLoading(true);
       setError(null);
       
-      const cityParam = city; // Use the city directly
+      const cityParam = city;
+      const priceParams = getPriceRangeParams(priceRange);
+      
+      // Build query parameters
+      const buildQueryParams = (baseParams = {}) => {
+        const params = new URLSearchParams({
+          city: cityParam,
+          ...baseParams,
+          ...priceParams
+        });
+        return params.toString();
+      };
       
       // Fetch all data in parallel
       const [
@@ -65,12 +99,12 @@ function App() {
         comingSoonResponse,
         priceChangesResponse
       ] = await Promise.all([
-        fetch(`${API_BASE_URL}/market/stats?city=${cityParam}`),
-        fetch(`${API_BASE_URL}/market/recent-sales?city=${cityParam}&limit=50`),
-        fetch(`${API_BASE_URL}/market/under-contract?city=${cityParam}&limit=50`),
-        fetch(`${API_BASE_URL}/market/active-listings?city=${cityParam}&limit=50`),
-        fetch(`${API_BASE_URL}/market/coming-soon?city=${cityParam}&limit=50`),
-        fetch(`${API_BASE_URL}/market/price-changes?city=${cityParam}&limit=50`)
+        fetch(`${API_BASE_URL}/market/stats?${buildQueryParams()}`),
+        fetch(`${API_BASE_URL}/market/recent-sales?${buildQueryParams({ limit: 50 })}`),
+        fetch(`${API_BASE_URL}/market/under-contract?${buildQueryParams({ limit: 50 })}`),
+        fetch(`${API_BASE_URL}/market/active-listings?${buildQueryParams({ limit: 50 })}`),
+        fetch(`${API_BASE_URL}/market/coming-soon?${buildQueryParams({ limit: 50 })}`),
+        fetch(`${API_BASE_URL}/market/price-changes?${buildQueryParams({ limit: 50 })}`)
       ]);
 
       // Check if all requests were successful
@@ -111,9 +145,9 @@ function App() {
   // Fetch data when activeCity changes (but only if we have cities loaded)
   useEffect(() => {
     if (activeCity && cities.length > 0) {
-      fetchData(activeCity);
+      fetchData(activeCity, activePriceRange);
     }
-  }, [activeCity, cities]);
+  }, [activeCity, cities, activePriceRange]);
 
   // Get featured property (first active listing)
   const featuredProperty = activeListings.length > 0 ? activeListings[0] : null;
@@ -136,7 +170,7 @@ function App() {
           <div className="text-red-600 text-xl mb-4">⚠️ Error</div>
           <p className="text-gray-600 mb-4">{error}</p>
           <button
-            onClick={() => fetchData(activeCity)}
+            onClick={() => fetchData(activeCity, activePriceRange)}
             className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
           >
             Retry
@@ -152,6 +186,8 @@ function App() {
         cities={cities}
         activeCity={activeCity}
         onCityChange={setActiveCity}
+        activePriceRange={activePriceRange}
+        onPriceRangeChange={setActivePriceRange}
       />
       
       <main className="max-w-7xl mx-auto px-3 sm:px-4 py-4 sm:py-8">

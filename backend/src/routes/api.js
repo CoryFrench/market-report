@@ -14,9 +14,13 @@ dbService.query('SELECT 1 as test')
 // Market Stats
 router.get('/market/stats', async (req, res) => {
   try {
-    const { city, area } = req.query; // Support both city and area for backwards compatibility
+    const { city, area, minPrice, maxPrice } = req.query; // Support both city and area for backwards compatibility
     const cityFilter = city || area;
-    const stats = await dbService.getMarketStats(cityFilter);
+    const stats = await dbService.getMarketStats(
+      cityFilter, 
+      minPrice ? parseFloat(minPrice) : null, 
+      maxPrice ? parseFloat(maxPrice) : null
+    );
     res.json(stats);
   } catch (error) {
     console.error('Error fetching market stats:', error);
@@ -27,9 +31,14 @@ router.get('/market/stats', async (req, res) => {
 // Recent Sales
 router.get('/market/recent-sales', async (req, res) => {
   try {
-    const { city, area, limit = 50 } = req.query; // Support both city and area for backwards compatibility
+    const { city, area, limit = 50, minPrice, maxPrice } = req.query; // Support both city and area for backwards compatibility
     const cityFilter = city || area;
-    const sales = await dbService.getRecentSales(cityFilter, parseInt(limit));
+    const sales = await dbService.getRecentSales(
+      cityFilter, 
+      parseInt(limit),
+      minPrice ? parseFloat(minPrice) : null, 
+      maxPrice ? parseFloat(maxPrice) : null
+    );
     res.json(sales);
   } catch (error) {
     console.error('Error fetching recent sales:', error);
@@ -40,9 +49,14 @@ router.get('/market/recent-sales', async (req, res) => {
 // Under Contract
 router.get('/market/under-contract', async (req, res) => {
   try {
-    const { city, area, limit = 50 } = req.query; // Support both city and area for backwards compatibility
+    const { city, area, limit = 50, minPrice, maxPrice } = req.query; // Support both city and area for backwards compatibility
     const cityFilter = city || area;
-    const contracts = await dbService.getUnderContract(cityFilter, parseInt(limit));
+    const contracts = await dbService.getUnderContract(
+      cityFilter, 
+      parseInt(limit),
+      minPrice ? parseFloat(minPrice) : null, 
+      maxPrice ? parseFloat(maxPrice) : null
+    );
     res.json(contracts);
   } catch (error) {
     console.error('Error fetching under contract listings:', error);
@@ -53,9 +67,14 @@ router.get('/market/under-contract', async (req, res) => {
 // Active Listings
 router.get('/market/active-listings', async (req, res) => {
   try {
-    const { city, area, limit = 50 } = req.query; // Support both city and area for backwards compatibility
+    const { city, area, limit = 50, minPrice, maxPrice } = req.query; // Support both city and area for backwards compatibility
     const cityFilter = city || area;
-    const listings = await dbService.getActiveListings(cityFilter, parseInt(limit));
+    const listings = await dbService.getActiveListings(
+      cityFilter, 
+      parseInt(limit),
+      minPrice ? parseFloat(minPrice) : null, 
+      maxPrice ? parseFloat(maxPrice) : null
+    );
     res.json(listings);
   } catch (error) {
     console.error('Error fetching active listings:', error);
@@ -66,9 +85,14 @@ router.get('/market/active-listings', async (req, res) => {
 // Coming Soon
 router.get('/market/coming-soon', async (req, res) => {
   try {
-    const { city, area, limit = 50 } = req.query; // Support both city and area for backwards compatibility
+    const { city, area, limit = 50, minPrice, maxPrice } = req.query; // Support both city and area for backwards compatibility
     const cityFilter = city || area;
-    const comingSoon = await dbService.getComingSoon(cityFilter, parseInt(limit));
+    const comingSoon = await dbService.getComingSoon(
+      cityFilter, 
+      parseInt(limit),
+      minPrice ? parseFloat(minPrice) : null, 
+      maxPrice ? parseFloat(maxPrice) : null
+    );
     res.json(comingSoon);
   } catch (error) {
     console.error('Error fetching coming soon listings:', error);
@@ -79,9 +103,14 @@ router.get('/market/coming-soon', async (req, res) => {
 // Price Changes
 router.get('/market/price-changes', async (req, res) => {
   try {
-    const { city, area, limit = 50 } = req.query; // Support both city and area for backwards compatibility
+    const { city, area, limit = 50, minPrice, maxPrice } = req.query; // Support both city and area for backwards compatibility
     const cityFilter = city || area;
-    const changes = await dbService.getPriceChanges(cityFilter, parseInt(limit));
+    const changes = await dbService.getPriceChanges(
+      cityFilter, 
+      parseInt(limit),
+      minPrice ? parseFloat(minPrice) : null, 
+      maxPrice ? parseFloat(maxPrice) : null
+    );
     res.json(changes);
   } catch (error) {
     console.error('Error fetching price changes:', error);
