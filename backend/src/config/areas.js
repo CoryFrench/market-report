@@ -2,52 +2,10 @@
 // This defines all supported area profiles and how to filter data for each
 
 const AREA_PROFILES = {
-  // City-based profiles (updated to match available database cities)
-  'boca-raton': {
-    name: 'Boca Raton',
-    description: 'Boca Raton area properties and market data',
-    type: 'city',
-    filters: {
-      city: 'Boca Raton'
-    }
-  },
-  'west-palm-beach': {
-    name: 'West Palm Beach', 
-    description: 'West Palm Beach area properties and market data',
-    type: 'city',
-    filters: {
-      city: 'West Palm Beach'
-    }
-  },
-  'boynton-beach': {
-    name: 'Boynton Beach',
-    description: 'Boynton Beach area properties and market data', 
-    type: 'city',
-    filters: {
-      city: 'Boynton Beach'
-    }
-  },
-  'delray-beach': {
-    name: 'Delray Beach',
-    description: 'Delray Beach area properties and market data',
-    type: 'city', 
-    filters: {
-      city: 'Delray Beach'
-    }
-  },
-  'port-saint-lucie': {
-    name: 'Port Saint Lucie',
-    description: 'Port Saint Lucie area properties and market data',
-    type: 'city', 
-    filters: {
-      city: 'Port Saint Lucie'
-    }
-  },
-
-  // Keep legacy Jupiter areas for backwards compatibility (but they'll return no data)
+  // City-based profiles
   'jupiter': {
     name: 'Jupiter',
-    description: 'Jupiter area properties and market data (no data available)',
+    description: 'Jupiter area properties and market data',
     type: 'city',
     filters: {
       city: 'Jupiter'
@@ -55,7 +13,7 @@ const AREA_PROFILES = {
   },
   'juno-beach': {
     name: 'Juno Beach', 
-    description: 'Juno Beach area properties and market data (no data available)',
+    description: 'Juno Beach area properties and market data',
     type: 'city',
     filters: {
       city: 'Juno Beach'
@@ -63,7 +21,7 @@ const AREA_PROFILES = {
   },
   'singer-island': {
     name: 'Singer Island',
-    description: 'Singer Island area properties and market data (no data available)', 
+    description: 'Singer Island area properties and market data', 
     type: 'city',
     filters: {
       city: 'Singer Island'
@@ -71,7 +29,7 @@ const AREA_PROFILES = {
   },
   'palm-beach-shores': {
     name: 'Palm Beach Shores',
-    description: 'Palm Beach Shores area properties and market data (no data available)',
+    description: 'Palm Beach Shores area properties and market data',
     type: 'city', 
     filters: {
       city: 'Palm Beach Shores'
@@ -112,31 +70,31 @@ const AREA_PROFILES = {
     }
   },
 
-  // Lifestyle-based profiles (updated to use available cities)
-  'boca-raton-waterfront': {
-    name: 'Boca Raton Waterfront Properties',
-    description: 'Waterfront homes and condos in Boca Raton',
+  // Lifestyle-based profiles (combinations)
+  'jupiter-waterfront': {
+    name: 'Jupiter Waterfront Properties',
+    description: 'Waterfront homes and condos in Jupiter',
     type: 'lifestyle',
     filters: {
-      city: 'Boca Raton',
+      city: 'Jupiter',
       waterfront: true
     }
   },
-  'boca-raton-luxury': {
-    name: 'Boca Raton Luxury Properties', 
-    description: 'High-end properties in Boca Raton over $2M',
+  'jupiter-luxury': {
+    name: 'Jupiter Luxury Properties', 
+    description: 'High-end properties in Jupiter over $2M',
     type: 'lifestyle',
     filters: {
-      city: 'Boca Raton',
+      city: 'Jupiter',
       minPrice: 2000000
     }
   },
-  'west-palm-beach-luxury': {
-    name: 'West Palm Beach Luxury Properties',
-    description: 'Luxury properties in West Palm Beach over $3M',
+  'singer-island-luxury': {
+    name: 'Singer Island Luxury Properties',
+    description: 'Luxury properties on Singer Island over $3M',
     type: 'lifestyle', 
     filters: {
-      city: 'West Palm Beach',
+      city: 'Singer Island',
       minPrice: 3000000
     }
   },

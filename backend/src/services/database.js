@@ -1072,23 +1072,10 @@ class DatabaseService {
   // Map frontend city names to database city names
   getCityFilter(city) {
     const cityMap = {
-      // Available cities (with data)
-      'boca-raton': 'Boca Raton',
-      'west-palm-beach': 'West Palm Beach',
-      'boynton-beach': 'Boynton Beach',
-      'delray-beach': 'Delray Beach',
-      'port-saint-lucie': 'Port Saint Lucie',
-      // Legacy beach communities (no data available)
       'jupiter': 'Jupiter',
       'juno-beach': 'Juno Beach',
       'singer-island': 'Singer Island',
       'palm-beach-shores': 'Palm Beach Shores',
-      // Direct name matches
-      'Boca Raton': 'Boca Raton',
-      'West Palm Beach': 'West Palm Beach',
-      'Boynton Beach': 'Boynton Beach',
-      'Delray Beach': 'Delray Beach',
-      'Port Saint Lucie': 'Port Saint Lucie',
       'Jupiter': 'Jupiter',
       'Juno Beach': 'Juno Beach',
       'Singer Island': 'Singer Island',
