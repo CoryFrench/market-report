@@ -20,10 +20,10 @@ const Dashboard = ({ area, marketStats, recentSales, underContract, activeListin
     <div className="bg-white rounded-lg shadow-lg p-4 sm:p-6 mb-6 sm:mb-8">
       <div className="mb-4 sm:mb-6">
         <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-2">
-          Market Overview - {area}
+          {area} Profile Overview
         </h2>
         <p className="text-sm text-gray-600">
-          Current market statistics and trends
+          Current market statistics and trends for {area}
         </p>
       </div>
       
