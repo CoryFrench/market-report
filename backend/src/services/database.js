@@ -15,6 +15,22 @@ class DatabaseService {
     });
   }
 
+  // Utility function to convert text to Title Case
+  toTitleCase(str) {
+    if (!str || typeof str !== 'string') return str;
+    
+    // List of words that should remain lowercase (articles, prepositions, conjunctions)
+    const lowercaseWords = ['a', 'an', 'and', 'as', 'at', 'but', 'by', 'for', 'if', 'in', 'nor', 'of', 'on', 'or', 'so', 'the', 'to', 'up', 'yet'];
+    
+    return str.toLowerCase().split(' ').map((word, index) => {
+      // Always capitalize the first and last word
+      if (index === 0 || !lowercaseWords.includes(word)) {
+        return word.charAt(0).toUpperCase() + word.slice(1);
+      }
+      return word;
+    }).join(' ');
+  }
+
   async query(text, params) {
     try {
       const result = await this.pool.query(text, params);
@@ -101,7 +117,7 @@ class DatabaseService {
       mlsId: row.mls_identifier,
       address: address,
       city: row.city,
-      subdivision: row.subdivision,
+      subdivision: this.toTitleCase(row.subdivision),
       bedrooms: parseInt(row.total_bedrooms) || 0,
       bathrooms: parseFloat(row.baths_total) || 0,
       halfBaths: parseFloat(row.baths_half) || 0,
