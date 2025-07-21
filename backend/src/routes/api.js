@@ -14,8 +14,9 @@ dbService.query('SELECT 1 as test')
 // Market Stats
 router.get('/market/stats', async (req, res) => {
   try {
-    const { area } = req.query;
-    const stats = await dbService.getMarketStats(area);
+    const { city, area } = req.query; // Support both city and area for backwards compatibility
+    const cityFilter = city || area;
+    const stats = await dbService.getMarketStats(cityFilter);
     res.json(stats);
   } catch (error) {
     console.error('Error fetching market stats:', error);
@@ -26,8 +27,9 @@ router.get('/market/stats', async (req, res) => {
 // Recent Sales
 router.get('/market/recent-sales', async (req, res) => {
   try {
-    const { area, limit = 50 } = req.query;
-    const sales = await dbService.getRecentSales(area, parseInt(limit));
+    const { city, area, limit = 50 } = req.query; // Support both city and area for backwards compatibility
+    const cityFilter = city || area;
+    const sales = await dbService.getRecentSales(cityFilter, parseInt(limit));
     res.json(sales);
   } catch (error) {
     console.error('Error fetching recent sales:', error);
@@ -38,8 +40,9 @@ router.get('/market/recent-sales', async (req, res) => {
 // Under Contract
 router.get('/market/under-contract', async (req, res) => {
   try {
-    const { area, limit = 50 } = req.query;
-    const contracts = await dbService.getUnderContract(area, parseInt(limit));
+    const { city, area, limit = 50 } = req.query; // Support both city and area for backwards compatibility
+    const cityFilter = city || area;
+    const contracts = await dbService.getUnderContract(cityFilter, parseInt(limit));
     res.json(contracts);
   } catch (error) {
     console.error('Error fetching under contract listings:', error);
@@ -50,8 +53,9 @@ router.get('/market/under-contract', async (req, res) => {
 // Active Listings
 router.get('/market/active-listings', async (req, res) => {
   try {
-    const { area, limit = 50 } = req.query;
-    const listings = await dbService.getActiveListings(area, parseInt(limit));
+    const { city, area, limit = 50 } = req.query; // Support both city and area for backwards compatibility
+    const cityFilter = city || area;
+    const listings = await dbService.getActiveListings(cityFilter, parseInt(limit));
     res.json(listings);
   } catch (error) {
     console.error('Error fetching active listings:', error);
@@ -62,8 +66,9 @@ router.get('/market/active-listings', async (req, res) => {
 // Coming Soon
 router.get('/market/coming-soon', async (req, res) => {
   try {
-    const { area, limit = 50 } = req.query;
-    const comingSoon = await dbService.getComingSoon(area, parseInt(limit));
+    const { city, area, limit = 50 } = req.query; // Support both city and area for backwards compatibility
+    const cityFilter = city || area;
+    const comingSoon = await dbService.getComingSoon(cityFilter, parseInt(limit));
     res.json(comingSoon);
   } catch (error) {
     console.error('Error fetching coming soon listings:', error);
@@ -74,8 +79,9 @@ router.get('/market/coming-soon', async (req, res) => {
 // Price Changes
 router.get('/market/price-changes', async (req, res) => {
   try {
-    const { area, limit = 50 } = req.query;
-    const changes = await dbService.getPriceChanges(area, parseInt(limit));
+    const { city, area, limit = 50 } = req.query; // Support both city and area for backwards compatibility
+    const cityFilter = city || area;
+    const changes = await dbService.getPriceChanges(cityFilter, parseInt(limit));
     res.json(changes);
   } catch (error) {
     console.error('Error fetching price changes:', error);
@@ -102,7 +108,7 @@ router.get('/properties/:id', async (req, res) => {
 router.get('/properties/search', async (req, res) => {
   try {
     const searchParams = {
-      area: req.query.area,
+      city: req.query.city || req.query.area, // Support both city and area for backwards compatibility
       minPrice: req.query.minPrice ? parseFloat(req.query.minPrice) : undefined,
       maxPrice: req.query.maxPrice ? parseFloat(req.query.maxPrice) : undefined,
       minBeds: req.query.minBeds ? parseInt(req.query.minBeds) : undefined,
@@ -120,6 +126,17 @@ router.get('/properties/search', async (req, res) => {
   } catch (error) {
     console.error('Error searching properties:', error);
     res.status(500).json({ error: 'Failed to search properties' });
+  }
+});
+
+// Get Available Cities
+router.get('/cities', async (req, res) => {
+  try {
+    const cities = await dbService.getAvailableCities();
+    res.json(cities);
+  } catch (error) {
+    console.error('Error fetching cities:', error);
+    res.status(500).json({ error: 'Failed to fetch cities' });
   }
 });
 

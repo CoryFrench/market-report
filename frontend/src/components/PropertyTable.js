@@ -28,25 +28,23 @@ function PropertyTable({
     });
   };
 
-  // Get base URL based on area
-  const getBaseUrl = () => {
-    return area === 'Singer Island' 
-      ? 'http://www.singerislandhomes.us'
-      : 'http://www.jupiteroceanfronthomes.us';
-  };
-
-  // Generate property URL
+  // Generate property URL for active listings only
   const getPropertyUrl = (property) => {
-    const baseUrl = getBaseUrl();
-    
-    // Check if we have listing ID for creating proper URL
+    // Check if we have listing ID (RX-#######) for creating proper URL
     if (property.id) {
-      // Simple format: [base_url]/listing/[listing_id_lowercase]
-      return `${baseUrl}/listing/${property.id.toLowerCase()}`;
+      // New format: https://waterfront-properties.com/listing/[lowercase-listing-id]
+      return `https://waterfront-properties.com/listing/${property.id.toLowerCase()}`;
     }
     
-    // Fallback URL if no listing ID
-    return `${baseUrl}/search`;
+    // Fallback - no URL if no listing ID
+    return null;
+  };
+
+  // Check if property should have a clickable link (only active listings)
+  const shouldHaveLink = (property) => {
+    // Only show links for active listings, not closed/sold properties
+    const status = property.status?.toLowerCase();
+    return status === 'active' || status === 'coming soon' || status === 'active under contract' || status === 'pending';
   };
 
   // Determine columns based on the flags and area - prioritize most important columns
@@ -103,17 +101,29 @@ function PropertyTable({
   const getCellValue = (property, column) => {
     switch (column) {
       case 'address':
-        return (
-          <a 
-            href={getPropertyUrl(property)}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-blue-600 hover:text-blue-800 underline text-sm"
-            style={{ color: '#006197' }}
-          >
-            {property.address || 'N/A'}
-          </a>
-        );
+        const propertyUrl = getPropertyUrl(property);
+        const hasLink = shouldHaveLink(property) && propertyUrl;
+        
+        if (hasLink) {
+          return (
+            <a 
+              href={propertyUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-blue-600 hover:text-blue-800 underline text-sm"
+              style={{ color: '#006197' }}
+            >
+              {property.address || 'N/A'}
+            </a>
+          );
+        } else {
+          // No link for closed/sold properties or properties without MLS ID
+          return (
+            <span className="text-sm">
+              {property.address || 'N/A'}
+            </span>
+          );
+        }
       case 'subdivision':
         return (
           <span className="text-xs" title={property.subdivision}>

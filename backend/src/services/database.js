@@ -394,9 +394,14 @@ class DatabaseService {
     };
   }
 
-  // Map frontend area names to database city names
+  // Map frontend city names to database city names (for backwards compatibility)
   getAreaFilter(area) {
-    const areaMap = {
+    return this.getCityFilter(area);
+  }
+
+  // Map frontend city names to database city names
+  getCityFilter(city) {
+    const cityMap = {
       'jupiter': 'Jupiter',
       'juno-beach': 'Juno Beach',
       'singer-island': 'Singer Island',
@@ -406,7 +411,7 @@ class DatabaseService {
       'Singer Island': 'Singer Island',
       'Palm Beach Shores': 'Palm Beach Shores'
     };
-    return areaMap[area] || area;
+    return cityMap[city] || city;
   }
 
   // Get property by ID
@@ -433,7 +438,7 @@ class DatabaseService {
   // Search properties
   async searchProperties(searchParams) {
     const {
-      area,
+      city,
       minPrice,
       maxPrice,
       minBeds,
@@ -450,10 +455,10 @@ class DatabaseService {
     let params = [status];
     let paramCount = 1;
 
-    if (area && area !== 'all') {
+    if (city && city !== 'all') {
       paramCount++;
       whereClause += ` AND city = $${paramCount}`;
-      params.push(this.getAreaFilter(area));
+      params.push(this.getCityFilter(city));
     }
 
     if (minPrice) {
@@ -524,6 +529,36 @@ class DatabaseService {
 
     const result = await this.query(query, params);
     return result.rows.map(row => this.mapProperty(row));
+  }
+
+  // Get available cities from the database
+  async getAvailableCities() {
+    const query = `
+      WITH latest_listings AS (
+        SELECT *,
+               ROW_NUMBER() OVER (
+                 PARTITION BY listing_id 
+                 ORDER BY timestamp DESC
+               ) as rn
+        FROM mls.beaches_residential
+        WHERE listing_id IS NOT NULL
+      )
+      SELECT DISTINCT city, COUNT(*) as property_count
+      FROM latest_listings 
+      WHERE rn = 1 
+        AND city IS NOT NULL 
+        AND city != ''
+        AND status IN ('Active', 'Closed', 'Active Under Contract', 'Pending', 'Coming Soon')
+      GROUP BY city
+      ORDER BY property_count DESC
+      LIMIT 20
+    `;
+
+    const result = await this.query(query);
+    return result.rows.map(row => ({
+      name: row.city,
+      count: parseInt(row.property_count) || 0
+    }));
   }
 
   // Close database connection

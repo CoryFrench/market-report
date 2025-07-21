@@ -7,7 +7,8 @@ import PropertyTable from './components/PropertyTable';
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL ? process.env.REACT_APP_API_BASE_URL + '/api' : 'http://localhost:3001/api';
 
 function App() {
-  const [activeArea, setActiveArea] = useState('Jupiter');
+  const [activeCity, setActiveCity] = useState('Jupiter');
+  const [cities, setCities] = useState([]);
   const [marketStats, setMarketStats] = useState({});
   const [recentSales, setRecentSales] = useState([]);
   const [underContract, setUnderContract] = useState([]);
@@ -17,20 +18,43 @@ function App() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // Areas configuration
-  const areas = [
-    'Jupiter',
-    'Juno Beach', 
-    'Singer Island'
-  ];
+  // Fetch available cities from the API
+  const fetchCities = async () => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/cities`);
+      if (!response.ok) {
+        throw new Error('Failed to fetch cities');
+      }
+      const citiesData = await response.json();
+      
+      // Extract city names from the response
+      const cityNames = citiesData.map(city => city.name);
+      setCities(cityNames);
+      
+      // Set default city if not already set or if current city is not in the list
+      if (!activeCity || !cityNames.includes(activeCity)) {
+        if (cityNames.length > 0) {
+          setActiveCity(cityNames[0]);
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching cities:', error);
+      // Fallback to hardcoded cities if API fails
+      const fallbackCities = ['Jupiter', 'Juno Beach', 'Singer Island', 'Palm Beach Shores'];
+      setCities(fallbackCities);
+      if (!activeCity || !fallbackCities.includes(activeCity)) {
+        setActiveCity(fallbackCities[0]);
+      }
+    }
+  };
 
-  // Fetch all data for the selected area
-  const fetchData = async (area) => {
+  // Fetch all data for the selected city
+  const fetchData = async (city) => {
     try {
       setLoading(true);
       setError(null);
       
-      const areaParam = area; // Use the area directly
+      const cityParam = city; // Use the city directly
       
       // Fetch all data in parallel
       const [
@@ -41,12 +65,12 @@ function App() {
         comingSoonResponse,
         priceChangesResponse
       ] = await Promise.all([
-        fetch(`${API_BASE_URL}/market/stats?area=${areaParam}`),
-        fetch(`${API_BASE_URL}/market/recent-sales?area=${areaParam}&limit=50`),
-        fetch(`${API_BASE_URL}/market/under-contract?area=${areaParam}&limit=50`),
-        fetch(`${API_BASE_URL}/market/active-listings?area=${areaParam}&limit=50`),
-        fetch(`${API_BASE_URL}/market/coming-soon?area=${areaParam}&limit=50`),
-        fetch(`${API_BASE_URL}/market/price-changes?area=${areaParam}&limit=50`)
+        fetch(`${API_BASE_URL}/market/stats?city=${cityParam}`),
+        fetch(`${API_BASE_URL}/market/recent-sales?city=${cityParam}&limit=50`),
+        fetch(`${API_BASE_URL}/market/under-contract?city=${cityParam}&limit=50`),
+        fetch(`${API_BASE_URL}/market/active-listings?city=${cityParam}&limit=50`),
+        fetch(`${API_BASE_URL}/market/coming-soon?city=${cityParam}&limit=50`),
+        fetch(`${API_BASE_URL}/market/price-changes?city=${cityParam}&limit=50`)
       ]);
 
       // Check if all requests were successful
@@ -79,10 +103,17 @@ function App() {
     }
   };
 
-  // Fetch data when component mounts or area changes
+  // Initial load - fetch cities first, then data
   useEffect(() => {
-    fetchData(activeArea);
-  }, [activeArea]);
+    fetchCities();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Fetch data when activeCity changes (but only if we have cities loaded)
+  useEffect(() => {
+    if (activeCity && cities.length > 0) {
+      fetchData(activeCity);
+    }
+  }, [activeCity, cities]);
 
   // Get featured property (first active listing)
   const featuredProperty = activeListings.length > 0 ? activeListings[0] : null;
@@ -105,7 +136,7 @@ function App() {
           <div className="text-red-600 text-xl mb-4">⚠️ Error</div>
           <p className="text-gray-600 mb-4">{error}</p>
           <button
-            onClick={() => fetchData(activeArea)}
+            onClick={() => fetchData(activeCity)}
             className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
           >
             Retry
@@ -118,14 +149,14 @@ function App() {
   return (
     <div className="min-h-screen bg-gray-50">
       <Header 
-        areas={areas}
-        activeArea={activeArea}
-        onAreaChange={setActiveArea}
+        cities={cities}
+        activeCity={activeCity}
+        onCityChange={setActiveCity}
       />
       
       <main className="max-w-7xl mx-auto px-4 py-8">
         <Dashboard 
-          area={activeArea}
+          area={activeCity}
           marketStats={marketStats}
           recentSales={recentSales}
           underContract={underContract}
@@ -143,34 +174,34 @@ function App() {
             title="Homes Sold in the Past 30 Days" 
             properties={recentSales}
             showSalePrice={true}
-            area={activeArea}
+            area={activeCity}
           />
           
           <PropertyTable 
             title="Homes Under Contract" 
             properties={underContract}
             showContractDate={true}
-            area={activeArea}
+            area={activeCity}
           />
           
           <PropertyTable 
             title="Active Listings" 
             properties={activeListings}
             showListPrice={true}
-            area={activeArea}
+            area={activeCity}
           />
           
           <PropertyTable 
             title="Coming Soon Listings" 
             properties={comingSoon}
-            area={activeArea}
+            area={activeCity}
           />
           
           <PropertyTable 
             title="Home Price Changes in the Past 30 Days" 
             properties={priceChanges}
             showPriceChange={true}
-            area={activeArea}
+            area={activeCity}
           />
         </div>
       </main>

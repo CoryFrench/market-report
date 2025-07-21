@@ -1,6 +1,6 @@
 import React from 'react';
 
-const Header = ({ areas, activeArea, onAreaChange }) => {
+const Header = ({ cities, activeCity, onCityChange }) => {
   return (
     <header className="bg-white shadow-md">
       <div className="max-w-7xl mx-auto px-4 py-6">
@@ -16,15 +16,15 @@ const Header = ({ areas, activeArea, onAreaChange }) => {
           
           <div className="flex items-center space-x-4">
             <div className="flex items-center space-x-2">
-              <span className="text-sm font-medium text-gray-700">Area:</span>
+              <span className="text-sm font-medium text-gray-700">City:</span>
               <select
-                value={activeArea}
-                onChange={(e) => onAreaChange(e.target.value)}
+                value={activeCity}
+                onChange={(e) => onCityChange(e.target.value)}
                 className="border border-gray-300 rounded-md px-3 py-2 text-sm font-medium text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               >
-                {areas.map((area) => (
-                  <option key={area} value={area}>
-                    {area}
+                {cities.map((city) => (
+                  <option key={city} value={city}>
+                    {city}
                   </option>
                 ))}
               </select>
