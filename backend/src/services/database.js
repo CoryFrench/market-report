@@ -184,7 +184,7 @@ class DatabaseService {
     let paramCount = 0;
 
     // Handle development-based filtering (requires JOIN with development_data)
-    if (filters.development_name || filters.subdivision_name) {
+    if (filters.development_name || filters.subdivision_name || filters.zone_name) {
       joinClause = `
         INNER JOIN waterfrontdata.development_data dd ON (
           -- Try to match on parcel number first
@@ -207,6 +207,12 @@ class DatabaseService {
         paramCount++;  
         whereClause += ` AND dd.subdivision_name = $${paramCount}`;
         params.push(filters.subdivision_name);
+      }
+
+      if (filters.zone_name) {
+        paramCount++;  
+        whereClause += ` AND dd.zone_name = $${paramCount}`;
+        params.push(filters.zone_name);
       }
     }
 

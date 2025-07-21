@@ -97,6 +97,16 @@ const AREA_PROFILES = {
       city: 'SINGER ISLAND',
       minPrice: 3000000
     }
+  },
+
+  // Zone-based profiles
+  'center-street-canals': {
+    name: 'Center Street Canals',
+    description: 'Exclusive waterfront properties in the Center Street Canals zone',
+    type: 'zone',
+    filters: {
+      zone_name: 'Center Street Canals'
+    }
   }
 };
 

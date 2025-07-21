@@ -16,6 +16,7 @@ const AreaNotFound = () => {
             <a href="/area-profile/juno-beach" className="hover:underline">Juno Beach</a>
             <a href="/area-profile/singer-island" className="hover:underline">Singer Island</a>
             <a href="/area-profile/admirals-cove" className="hover:underline">Admirals Cove</a>
+            <a href="/area-profile/center-street-canals" className="hover:underline">Center Street Canals</a>
           </div>
         </div>
       </div>
