@@ -1,0 +1,135 @@
+const express = require('express');
+const DatabaseService = require('../services/database');
+
+const router = express.Router();
+
+// Initialize database service
+const dbService = new DatabaseService();
+
+// Test database connection
+dbService.query('SELECT 1 as test')
+  .then(() => console.log('✅ Database connected successfully'))
+  .catch(err => console.error('❌ Database connection failed:', err.message));
+
+// Market Stats
+router.get('/market/stats', async (req, res) => {
+  try {
+    const { area } = req.query;
+    const stats = await dbService.getMarketStats(area);
+    res.json(stats);
+  } catch (error) {
+    console.error('Error fetching market stats:', error);
+    res.status(500).json({ error: 'Failed to fetch market stats' });
+  }
+});
+
+// Recent Sales
+router.get('/market/recent-sales', async (req, res) => {
+  try {
+    const { area, limit = 50 } = req.query;
+    const sales = await dbService.getRecentSales(area, parseInt(limit));
+    res.json(sales);
+  } catch (error) {
+    console.error('Error fetching recent sales:', error);
+    res.status(500).json({ error: 'Failed to fetch recent sales' });
+  }
+});
+
+// Under Contract
+router.get('/market/under-contract', async (req, res) => {
+  try {
+    const { area, limit = 50 } = req.query;
+    const contracts = await dbService.getUnderContract(area, parseInt(limit));
+    res.json(contracts);
+  } catch (error) {
+    console.error('Error fetching under contract listings:', error);
+    res.status(500).json({ error: 'Failed to fetch under contract listings' });
+  }
+});
+
+// Active Listings
+router.get('/market/active-listings', async (req, res) => {
+  try {
+    const { area, limit = 50 } = req.query;
+    const listings = await dbService.getActiveListings(area, parseInt(limit));
+    res.json(listings);
+  } catch (error) {
+    console.error('Error fetching active listings:', error);
+    res.status(500).json({ error: 'Failed to fetch active listings' });
+  }
+});
+
+// Coming Soon
+router.get('/market/coming-soon', async (req, res) => {
+  try {
+    const { area, limit = 50 } = req.query;
+    const comingSoon = await dbService.getComingSoon(area, parseInt(limit));
+    res.json(comingSoon);
+  } catch (error) {
+    console.error('Error fetching coming soon listings:', error);
+    res.status(500).json({ error: 'Failed to fetch coming soon listings' });
+  }
+});
+
+// Price Changes
+router.get('/market/price-changes', async (req, res) => {
+  try {
+    const { area, limit = 50 } = req.query;
+    const changes = await dbService.getPriceChanges(area, parseInt(limit));
+    res.json(changes);
+  } catch (error) {
+    console.error('Error fetching price changes:', error);
+    res.status(500).json({ error: 'Failed to fetch price changes' });
+  }
+});
+
+// Property by ID
+router.get('/properties/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const property = await dbService.getPropertyById(id);
+    if (!property) {
+      return res.status(404).json({ error: 'Property not found' });
+    }
+    res.json(property);
+  } catch (error) {
+    console.error('Error fetching property:', error);
+    res.status(500).json({ error: 'Failed to fetch property' });
+  }
+});
+
+// Property Search
+router.get('/properties/search', async (req, res) => {
+  try {
+    const searchParams = {
+      area: req.query.area,
+      minPrice: req.query.minPrice ? parseFloat(req.query.minPrice) : undefined,
+      maxPrice: req.query.maxPrice ? parseFloat(req.query.maxPrice) : undefined,
+      minBeds: req.query.minBeds ? parseInt(req.query.minBeds) : undefined,
+      maxBeds: req.query.maxBeds ? parseInt(req.query.maxBeds) : undefined,
+      minBaths: req.query.minBaths ? parseFloat(req.query.minBaths) : undefined,
+      maxBaths: req.query.maxBaths ? parseFloat(req.query.maxBaths) : undefined,
+      hasPool: req.query.hasPool === 'true',
+      waterfront: req.query.waterfront === 'true',
+      status: req.query.status || 'Active',
+      limit: req.query.limit ? parseInt(req.query.limit) : 50
+    };
+
+    const properties = await dbService.searchProperties(searchParams);
+    res.json(properties);
+  } catch (error) {
+    console.error('Error searching properties:', error);
+    res.status(500).json({ error: 'Failed to search properties' });
+  }
+});
+
+// Health check
+router.get('/health', (req, res) => {
+  res.json({ 
+    status: 'ok', 
+    timestamp: new Date().toISOString(),
+    database: 'connected'
+  });
+});
+
+module.exports = router; 
