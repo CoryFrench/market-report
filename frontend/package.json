@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "description": "MLS Dashboard Frontend",
   "private": true,
-  "homepage": "/market-report",
+  "homepage": "/area-profile",
   "dependencies": {
     "@testing-library/jest-dom": "^5.16.5",
     "@testing-library/react": "^13.4.0",

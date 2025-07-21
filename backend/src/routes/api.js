@@ -1,5 +1,6 @@
 const express = require('express');
 const DatabaseService = require('../services/database');
+const { getAreaProfile, getAllAreaProfiles, isValidAreaId } = require('../config/areas');
 
 const router = express.Router();
 
@@ -10,6 +11,175 @@ const dbService = new DatabaseService();
 dbService.query('SELECT 1 as test')
   .then(() => console.log('✅ Database connected successfully'))
   .catch(err => console.error('❌ Database connection failed:', err.message));
+
+// ========== AREA PROFILE ENDPOINTS ==========
+
+// Get area profile info
+router.get('/areas/:areaId', async (req, res) => {
+  try {
+    const { areaId } = req.params;
+    const areaProfile = getAreaProfile(areaId);
+    
+    if (!areaProfile) {
+      return res.status(404).json({ error: 'Area profile not found' });
+    }
+    
+    res.json(areaProfile);
+  } catch (error) {
+    console.error('Error fetching area profile:', error);
+    res.status(500).json({ error: 'Failed to fetch area profile' });
+  }
+});
+
+// Get all available area profiles
+router.get('/areas', async (req, res) => {
+  try {
+    const areas = getAllAreaProfiles();
+    res.json(areas);
+  } catch (error) {
+    console.error('Error fetching area profiles:', error);
+    res.status(500).json({ error: 'Failed to fetch area profiles' });
+  }
+});
+
+// Area Profile Market Stats
+router.get('/areas/:areaId/stats', async (req, res) => {
+  try {
+    const { areaId } = req.params;
+    const { minPrice, maxPrice } = req.query;
+    
+    if (!isValidAreaId(areaId)) {
+      return res.status(404).json({ error: 'Area profile not found' });
+    }
+    
+    const stats = await dbService.getMarketStatsForArea(
+      areaId,
+      minPrice ? parseFloat(minPrice) : null, 
+      maxPrice ? parseFloat(maxPrice) : null
+    );
+    res.json(stats);
+  } catch (error) {
+    console.error('Error fetching area market stats:', error);
+    res.status(500).json({ error: 'Failed to fetch area market stats' });
+  }
+});
+
+// Area Profile Recent Sales
+router.get('/areas/:areaId/recent-sales', async (req, res) => {
+  try {
+    const { areaId } = req.params;
+    const { limit = 50, minPrice, maxPrice } = req.query;
+    
+    if (!isValidAreaId(areaId)) {
+      return res.status(404).json({ error: 'Area profile not found' });
+    }
+    
+    const sales = await dbService.getRecentSalesForArea(
+      areaId,
+      parseInt(limit),
+      minPrice ? parseFloat(minPrice) : null, 
+      maxPrice ? parseFloat(maxPrice) : null
+    );
+    res.json(sales);
+  } catch (error) {
+    console.error('Error fetching area recent sales:', error);
+    res.status(500).json({ error: 'Failed to fetch area recent sales' });
+  }
+});
+
+// Area Profile Under Contract
+router.get('/areas/:areaId/under-contract', async (req, res) => {
+  try {
+    const { areaId } = req.params;
+    const { limit = 50, minPrice, maxPrice } = req.query;
+    
+    if (!isValidAreaId(areaId)) {
+      return res.status(404).json({ error: 'Area profile not found' });
+    }
+    
+    const contracts = await dbService.getUnderContractForArea(
+      areaId,
+      parseInt(limit),
+      minPrice ? parseFloat(minPrice) : null, 
+      maxPrice ? parseFloat(maxPrice) : null
+    );
+    res.json(contracts);
+  } catch (error) {
+    console.error('Error fetching area under contract listings:', error);
+    res.status(500).json({ error: 'Failed to fetch area under contract listings' });
+  }
+});
+
+// Area Profile Active Listings
+router.get('/areas/:areaId/active-listings', async (req, res) => {
+  try {
+    const { areaId } = req.params;
+    const { limit = 50, minPrice, maxPrice } = req.query;
+    
+    if (!isValidAreaId(areaId)) {
+      return res.status(404).json({ error: 'Area profile not found' });
+    }
+    
+    const listings = await dbService.getActiveListingsForArea(
+      areaId,
+      parseInt(limit),
+      minPrice ? parseFloat(minPrice) : null, 
+      maxPrice ? parseFloat(maxPrice) : null
+    );
+    res.json(listings);
+  } catch (error) {
+    console.error('Error fetching area active listings:', error);
+    res.status(500).json({ error: 'Failed to fetch area active listings' });
+  }
+});
+
+// Area Profile Coming Soon
+router.get('/areas/:areaId/coming-soon', async (req, res) => {
+  try {
+    const { areaId } = req.params;
+    const { limit = 50, minPrice, maxPrice } = req.query;
+    
+    if (!isValidAreaId(areaId)) {
+      return res.status(404).json({ error: 'Area profile not found' });
+    }
+    
+    const comingSoon = await dbService.getComingSoonForArea(
+      areaId,
+      parseInt(limit),
+      minPrice ? parseFloat(minPrice) : null, 
+      maxPrice ? parseFloat(maxPrice) : null
+    );
+    res.json(comingSoon);
+  } catch (error) {
+    console.error('Error fetching area coming soon listings:', error);
+    res.status(500).json({ error: 'Failed to fetch area coming soon listings' });
+  }
+});
+
+// Area Profile Price Changes
+router.get('/areas/:areaId/price-changes', async (req, res) => {
+  try {
+    const { areaId } = req.params;
+    const { limit = 50, minPrice, maxPrice } = req.query;
+    
+    if (!isValidAreaId(areaId)) {
+      return res.status(404).json({ error: 'Area profile not found' });
+    }
+    
+    const changes = await dbService.getPriceChangesForArea(
+      areaId,
+      parseInt(limit),
+      minPrice ? parseFloat(minPrice) : null, 
+      maxPrice ? parseFloat(maxPrice) : null
+    );
+    res.json(changes);
+  } catch (error) {
+    console.error('Error fetching area price changes:', error);
+    res.status(500).json({ error: 'Failed to fetch area price changes' });
+  }
+});
+
+// ========== LEGACY ENDPOINTS (for backwards compatibility) ==========
 
 // Market Stats
 router.get('/market/stats', async (req, res) => {

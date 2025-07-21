@@ -5,11 +5,11 @@ FROM node:18-alpine as builder
 WORKDIR /app
 
 # Accept build arguments
-ARG REACT_APP_API_BASE_URL=/market-report
+ARG REACT_APP_API_BASE_URL=/area-profile
 
 # Set environment variables for build
 ENV REACT_APP_API_BASE_URL=$REACT_APP_API_BASE_URL
-ENV PUBLIC_URL=/market-report
+ENV PUBLIC_URL=/area-profile
 
 # Copy package files
 COPY package*.json ./
