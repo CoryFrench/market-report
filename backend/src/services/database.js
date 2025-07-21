@@ -166,6 +166,459 @@ class DatabaseService {
     };
   }
 
+  // ========== NEW SEMANTIC FILTER METHODS ==========
+
+  // Build semantic filter query based on filter type and value
+  buildSemanticQuery(filterType, filterValue) {
+    let joinClause = '';
+    let whereClause = '';
+    let params = [];
+    let paramCount = 0;
+
+    switch (filterType) {
+      case 'city':
+        paramCount++;
+        whereClause += ` AND mls.city = $${paramCount}`;
+        params.push(this.getCityFilter(filterValue));
+        break;
+
+      case 'development':
+      case 'zone':
+      case 'subdivision':
+      case 'region':
+        // These require JOIN with development_data
+        joinClause = `
+          INNER JOIN waterfrontdata.development_data dd ON (
+            -- Try to match on parcel number first
+            CASE 
+              WHEN mls.parcel_id IS NOT NULL AND mls.parcel_id != '' 
+              THEN mls.parcel_id = dd.parcel_number
+              -- Fallback to address matching if no parcel match
+              ELSE UPPER(TRIM(mls.street_number || ' ' || mls.street_name)) = UPPER(TRIM(dd.property_address_line_1))
+            END
+          )
+        `;
+
+        paramCount++;
+        if (filterType === 'development') {
+          whereClause += ` AND dd.development_name = $${paramCount}`;
+        } else if (filterType === 'zone') {
+          whereClause += ` AND dd.zone_name = $${paramCount}`;
+        } else if (filterType === 'subdivision') {
+          whereClause += ` AND dd.subdivision_name = $${paramCount}`;
+        } else if (filterType === 'region') {
+          whereClause += ` AND dd.region_name = $${paramCount}`;
+        }
+        params.push(filterValue);
+        break;
+
+      default:
+        throw new Error(`Unsupported filter type: ${filterType}`);
+    }
+
+    return {
+      joinClause,
+      whereClause,
+      params,
+      paramCount
+    };
+  }
+
+  // Get market statistics for semantic filter
+  async getMarketStatsForFilter(filterType, filterValue, minPrice = null, maxPrice = null) {
+    const semanticQuery = this.buildSemanticQuery(filterType, filterValue);
+    let params = [...semanticQuery.params];
+    let paramCount = semanticQuery.paramCount;
+
+    // Price filtering for different statuses
+    let priceFilterClause = "";
+    if (minPrice || maxPrice) {
+      let priceConditions = [];
+      
+      if (minPrice && maxPrice) {
+        paramCount++;
+        paramCount++;
+        priceConditions.push(`(
+          (mls.status IN ('Active', 'Active Under Contract', 'Pending', 'Coming Soon') AND mls.list_price IS NOT NULL AND mls.list_price != '' AND mls.list_price::numeric BETWEEN $${paramCount-1} AND $${paramCount}) OR
+          (mls.status = 'Closed' AND mls.sold_price IS NOT NULL AND mls.sold_price != '' AND mls.sold_price::numeric BETWEEN $${paramCount-1} AND $${paramCount})
+        )`);
+        params.push(minPrice, maxPrice);
+      } else if (minPrice) {
+        paramCount++;
+        priceConditions.push(`(
+          (mls.status IN ('Active', 'Active Under Contract', 'Pending', 'Coming Soon') AND mls.list_price IS NOT NULL AND mls.list_price != '' AND mls.list_price::numeric >= $${paramCount}) OR
+          (mls.status = 'Closed' AND mls.sold_price IS NOT NULL AND mls.sold_price != '' AND mls.sold_price::numeric >= $${paramCount})
+        )`);
+        params.push(minPrice);
+      } else if (maxPrice) {
+        paramCount++;
+        priceConditions.push(`(
+          (mls.status IN ('Active', 'Active Under Contract', 'Pending', 'Coming Soon') AND mls.list_price IS NOT NULL AND mls.list_price != '' AND mls.list_price::numeric <= $${paramCount}) OR
+          (mls.status = 'Closed' AND mls.sold_price IS NOT NULL AND mls.sold_price != '' AND mls.sold_price::numeric <= $${paramCount})
+        )`);
+        params.push(maxPrice);
+      }
+      
+      if (priceConditions.length > 0) {
+        priceFilterClause = " AND " + priceConditions.join(" AND ");
+      }
+    }
+
+    const query = `
+      WITH latest_listings AS (
+        SELECT mls.*,
+               ROW_NUMBER() OVER (
+                 PARTITION BY mls.listing_id 
+                 ORDER BY mls.timestamp DESC
+               ) as rn
+        FROM mls.beaches_residential mls
+        ${semanticQuery.joinClause}
+        WHERE mls.listing_id IS NOT NULL
+          ${semanticQuery.whereClause}
+          ${priceFilterClause}
+      ),
+      calculated_stats AS (
+        SELECT *,
+               CASE 
+                 WHEN status = 'Closed' AND sold_date IS NOT NULL AND sold_date != '' AND listing_date IS NOT NULL AND listing_date != ''
+                 THEN sold_date::date - listing_date::date
+                 WHEN status IN ('Active Under Contract', 'Pending') AND under_contract_date IS NOT NULL AND under_contract_date != '' AND listing_date IS NOT NULL AND listing_date != ''
+                 THEN under_contract_date::date - listing_date::date
+                 WHEN status = 'Active' AND listing_date IS NOT NULL AND listing_date != ''
+                 THEN CURRENT_DATE - listing_date::date
+                 ELSE NULL
+               END as calculated_days_on_market
+        FROM latest_listings 
+        WHERE rn = 1
+      )
+      SELECT 
+        COUNT(CASE WHEN status = 'Active' THEN 1 END) as active_listings,
+        COUNT(CASE WHEN status = 'Closed' AND ${this.castDate('sold_date')} >= CURRENT_DATE - INTERVAL '30 days' THEN 1 END) as sales_last_30_days,
+        COUNT(CASE WHEN status IN ('Active Under Contract', 'Pending') THEN 1 END) as under_contract,
+        COUNT(CASE WHEN status = 'Coming Soon' THEN 1 END) as coming_soon,
+        COUNT(CASE WHEN status = 'Active' AND ${this.castTimestamp('price_change_timestamp')} >= CURRENT_DATE - INTERVAL '30 days' AND prior_list_price IS NOT NULL AND prior_list_price != '' AND prior_list_price != list_price THEN 1 END) as price_changes_last_30_days,
+        AVG(CASE WHEN status = 'Active' AND calculated_days_on_market > 0 THEN calculated_days_on_market END) as avg_days_on_market,
+        AVG(CASE WHEN status = 'Closed' AND ${this.castDate('sold_date')} >= CURRENT_DATE - INTERVAL '30 days' AND sold_price IS NOT NULL AND sold_price != '' THEN sold_price::numeric END) as avg_sold_price,
+        AVG(CASE WHEN status = 'Active' AND list_price IS NOT NULL AND list_price != '' THEN list_price::numeric END) as avg_list_price,
+        MIN(CASE WHEN status = 'Active' AND list_price IS NOT NULL AND list_price != '' THEN list_price::numeric END) as min_list_price,
+        MAX(CASE WHEN status = 'Active' AND list_price IS NOT NULL AND list_price != '' THEN list_price::numeric END) as max_list_price
+      FROM calculated_stats
+    `;
+
+    const result = await this.query(query, params);
+    const stats = result.rows[0];
+
+    return {
+      totalActiveListing: parseInt(stats.active_listings) || 0,
+      totalSalesLast30Days: parseInt(stats.sales_last_30_days) || 0,
+      totalUnderContract: parseInt(stats.under_contract) || 0,
+      totalComingSoon: parseInt(stats.coming_soon) || 0,
+      totalPriceChangesLast30Days: parseInt(stats.price_changes_last_30_days) || 0,
+      averageDaysOnMarket: Math.round(parseFloat(stats.avg_days_on_market) || 0),
+      averageSoldPrice: Math.round(parseFloat(stats.avg_sold_price) || 0),
+      averageListPrice: Math.round(parseFloat(stats.avg_list_price) || 0),
+      minListPrice: Math.round(parseFloat(stats.min_list_price) || 0),
+      maxListPrice: Math.round(parseFloat(stats.max_list_price) || 0),
+      lastUpdated: new Date().toISOString()
+    };
+  }
+
+  // Get active listings for semantic filter
+  async getActiveListingsForFilter(filterType, filterValue, limit = 50, minPrice = null, maxPrice = null) {
+    const semanticQuery = this.buildSemanticQuery(filterType, filterValue);
+    let additionalWhere = "";
+    let params = [...semanticQuery.params];
+    let paramCount = semanticQuery.paramCount;
+
+    // Add user-specified price filtering
+    if (minPrice) {
+      paramCount++;
+      additionalWhere += ` AND mls.list_price IS NOT NULL AND mls.list_price != '' AND mls.list_price::numeric >= $${paramCount}`;
+      params.push(minPrice);
+    }
+
+    if (maxPrice) {
+      paramCount++;
+      additionalWhere += ` AND mls.list_price IS NOT NULL AND mls.list_price != '' AND mls.list_price::numeric <= $${paramCount}`;
+      params.push(maxPrice);
+    }
+
+    paramCount++;
+    const query = `
+      WITH latest_listings AS (
+        SELECT mls.*,
+               ROW_NUMBER() OVER (
+                 PARTITION BY mls.listing_id 
+                 ORDER BY mls.timestamp DESC
+               ) as rn
+        FROM mls.beaches_residential mls
+        ${semanticQuery.joinClause}
+        WHERE mls.listing_id IS NOT NULL 
+          AND mls.status = 'Active'
+          ${semanticQuery.whereClause}
+          ${additionalWhere}
+      )
+      SELECT * FROM latest_listings 
+      WHERE rn = 1
+      ORDER BY ${this.castDate('listing_date')} DESC NULLS LAST
+      LIMIT $${paramCount}
+    `;
+    params.push(limit);
+
+    const result = await this.query(query, params);
+    return result.rows.map(row => this.mapProperty(row));
+  }
+
+  // Get recent sales for semantic filter
+  async getRecentSalesForFilter(filterType, filterValue, limit = 50, minPrice = null, maxPrice = null) {
+    const semanticQuery = this.buildSemanticQuery(filterType, filterValue);
+    let additionalWhere = "";
+    let params = [...semanticQuery.params];
+    let paramCount = semanticQuery.paramCount;
+
+    // Add user-specified price filtering (on sold price for sales)
+    if (minPrice) {
+      paramCount++;
+      additionalWhere += ` AND mls.sold_price IS NOT NULL AND mls.sold_price != '' AND mls.sold_price::numeric >= $${paramCount}`;
+      params.push(minPrice);
+    }
+
+    if (maxPrice) {
+      paramCount++;
+      additionalWhere += ` AND mls.sold_price IS NOT NULL AND mls.sold_price != '' AND mls.sold_price::numeric <= $${paramCount}`;
+      params.push(maxPrice);
+    }
+
+    paramCount++;
+    const query = `
+      WITH latest_listings AS (
+        SELECT mls.*,
+               ROW_NUMBER() OVER (
+                 PARTITION BY mls.listing_id 
+                 ORDER BY mls.timestamp DESC
+               ) as rn
+        FROM mls.beaches_residential mls
+        ${semanticQuery.joinClause}
+        WHERE mls.listing_id IS NOT NULL
+          AND mls.status = 'Closed' 
+          AND ${this.castDate('sold_date')} >= CURRENT_DATE - INTERVAL '30 days'
+          ${semanticQuery.whereClause}
+          ${additionalWhere}
+      )
+      SELECT * FROM latest_listings 
+      WHERE rn = 1
+      ORDER BY ${this.castDate('sold_date')} DESC NULLS LAST
+      LIMIT $${paramCount}
+    `;
+    params.push(limit);
+
+    const result = await this.query(query, params);
+    return result.rows.map(row => this.mapProperty(row));
+  }
+
+  // Get under contract properties for semantic filter
+  async getUnderContractForFilter(filterType, filterValue, limit = 50, minPrice = null, maxPrice = null) {
+    const semanticQuery = this.buildSemanticQuery(filterType, filterValue);
+    let additionalWhere = "";
+    let params = [...semanticQuery.params];
+    let paramCount = semanticQuery.paramCount;
+
+    if (minPrice) {
+      paramCount++;
+      additionalWhere += ` AND mls.list_price IS NOT NULL AND mls.list_price != '' AND mls.list_price::numeric >= $${paramCount}`;
+      params.push(minPrice);
+    }
+
+    if (maxPrice) {
+      paramCount++;
+      additionalWhere += ` AND mls.list_price IS NOT NULL AND mls.list_price != '' AND mls.list_price::numeric <= $${paramCount}`;
+      params.push(maxPrice);
+    }
+
+    paramCount++;
+    const query = `
+      WITH latest_listings AS (
+        SELECT mls.*,
+               ROW_NUMBER() OVER (
+                 PARTITION BY mls.listing_id 
+                 ORDER BY mls.timestamp DESC
+               ) as rn
+        FROM mls.beaches_residential mls
+        ${semanticQuery.joinClause}
+        WHERE mls.listing_id IS NOT NULL
+          AND mls.status IN ('Active Under Contract', 'Pending')
+          ${semanticQuery.whereClause}
+          ${additionalWhere}
+      )
+      SELECT * FROM latest_listings 
+      WHERE rn = 1
+      ORDER BY ${this.castDate('under_contract_date')} DESC NULLS LAST
+      LIMIT $${paramCount}
+    `;
+    params.push(limit);
+
+    const result = await this.query(query, params);
+    return result.rows.map(row => this.mapProperty(row));
+  }
+
+  // Get coming soon properties for semantic filter
+  async getComingSoonForFilter(filterType, filterValue, limit = 50, minPrice = null, maxPrice = null) {
+    const semanticQuery = this.buildSemanticQuery(filterType, filterValue);
+    let additionalWhere = "";
+    let params = [...semanticQuery.params];
+    let paramCount = semanticQuery.paramCount;
+
+    if (minPrice) {
+      paramCount++;
+      additionalWhere += ` AND mls.list_price IS NOT NULL AND mls.list_price != '' AND mls.list_price::numeric >= $${paramCount}`;
+      params.push(minPrice);
+    }
+
+    if (maxPrice) {
+      paramCount++;
+      additionalWhere += ` AND mls.list_price IS NOT NULL AND mls.list_price != '' AND mls.list_price::numeric <= $${paramCount}`;
+      params.push(maxPrice);
+    }
+
+    paramCount++;
+    const query = `
+      WITH latest_listings AS (
+        SELECT mls.*,
+               ROW_NUMBER() OVER (
+                 PARTITION BY mls.listing_id 
+                 ORDER BY mls.timestamp DESC
+               ) as rn
+        FROM mls.beaches_residential mls
+        ${semanticQuery.joinClause}
+        WHERE mls.listing_id IS NOT NULL
+          AND mls.status = 'Coming Soon'
+          ${semanticQuery.whereClause}
+          ${additionalWhere}
+      )
+      SELECT * FROM latest_listings 
+      WHERE rn = 1
+      ORDER BY ${this.castDate('listing_date')} DESC NULLS LAST
+      LIMIT $${paramCount}
+    `;
+    params.push(limit);
+
+    const result = await this.query(query, params);
+    return result.rows.map(row => this.mapProperty(row));
+  }
+
+  // Get price changes for semantic filter
+  async getPriceChangesForFilter(filterType, filterValue, limit = 50, minPrice = null, maxPrice = null) {
+    const semanticQuery = this.buildSemanticQuery(filterType, filterValue);
+    let additionalWhere = "";
+    let params = [...semanticQuery.params];
+    let paramCount = semanticQuery.paramCount;
+
+    if (minPrice) {
+      paramCount++;
+      additionalWhere += ` AND mls.list_price IS NOT NULL AND mls.list_price != '' AND mls.list_price::numeric >= $${paramCount}`;
+      params.push(minPrice);
+    }
+
+    if (maxPrice) {
+      paramCount++;
+      additionalWhere += ` AND mls.list_price IS NOT NULL AND mls.list_price != '' AND mls.list_price::numeric <= $${paramCount}`;
+      params.push(maxPrice);
+    }
+
+    paramCount++;
+    const query = `
+      WITH latest_listings AS (
+        SELECT mls.*,
+               ROW_NUMBER() OVER (
+                 PARTITION BY mls.listing_id 
+                 ORDER BY mls.timestamp DESC
+               ) as rn
+        FROM mls.beaches_residential mls
+        ${semanticQuery.joinClause}
+        WHERE mls.listing_id IS NOT NULL
+          AND mls.status = 'Active' 
+          AND ${this.castTimestamp('price_change_timestamp')} >= CURRENT_DATE - INTERVAL '30 days'
+          AND mls.prior_list_price IS NOT NULL 
+          AND mls.prior_list_price != ''
+          AND mls.prior_list_price != mls.list_price
+          ${semanticQuery.whereClause}
+          ${additionalWhere}
+      )
+      SELECT *, 
+             prior_list_price as previousPrice, 
+             list_price as currentPrice
+      FROM latest_listings 
+      WHERE rn = 1
+      ORDER BY ${this.castTimestamp('price_change_timestamp')} DESC NULLS LAST
+      LIMIT $${paramCount}
+    `;
+    params.push(limit);
+
+    const result = await this.query(query, params);
+    return result.rows.map(row => {
+      const property = this.mapProperty(row);
+      // Override with price change specific values
+      property.previousPrice = parseFloat(row.previousprice) || 0;
+      property.currentPrice = parseFloat(row.currentprice) || 0;
+      property.priceChange = property.currentPrice - property.previousPrice;
+      property.priceChangePercent = property.previousPrice > 0 ? 
+        ((property.currentPrice - property.previousPrice) / property.previousPrice * 100).toFixed(1) : 0;
+      return property;
+    });
+  }
+
+  // Get available values for a specific filter type
+  async getAvailableFilterValues(filterType) {
+    let query;
+    let fieldName;
+
+    switch (filterType) {
+      case 'city':
+        return this.getAvailableCities();
+
+      case 'development':
+        fieldName = 'development_name';
+        break;
+      case 'zone':
+        fieldName = 'zone_name';
+        break;
+      case 'subdivision':
+        fieldName = 'subdivision_name';
+        break;
+      case 'region':
+        fieldName = 'region_name';
+        break;
+
+      default:
+        throw new Error(`Unsupported filter type: ${filterType}`);
+    }
+
+    // For development data fields
+    query = `
+      SELECT DISTINCT ${fieldName} as name, COUNT(*) as property_count
+      FROM waterfrontdata.development_data dd
+      INNER JOIN mls.beaches_residential mls ON (
+        CASE 
+          WHEN mls.parcel_id IS NOT NULL AND mls.parcel_id != '' 
+          THEN mls.parcel_id = dd.parcel_number
+          ELSE UPPER(TRIM(mls.street_number || ' ' || mls.street_name)) = UPPER(TRIM(dd.property_address_line_1))
+        END
+      )
+      WHERE ${fieldName} IS NOT NULL AND ${fieldName} != ''
+      GROUP BY ${fieldName}
+      ORDER BY property_count DESC
+      LIMIT 50
+    `;
+
+    const result = await this.query(query);
+    return result.rows.map(row => ({
+      name: row.name,
+      count: parseInt(row.property_count) || 0
+    }));
+  }
+
+  // ========== LEGACY AREA-BASED METHODS (for backwards compatibility) ==========
+
   // Build area-based WHERE clause and JOIN clause for queries
   buildAreaQuery(areaId) {
     const areaProfile = getAreaProfile(areaId);

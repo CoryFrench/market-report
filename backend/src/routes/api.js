@@ -12,7 +12,175 @@ dbService.query('SELECT 1 as test')
   .then(() => console.log('✅ Database connected successfully'))
   .catch(err => console.error('❌ Database connection failed:', err.message));
 
-// ========== AREA PROFILE ENDPOINTS ==========
+// ========== NEW SEMANTIC AREA PROFILE ENDPOINTS ==========
+
+// Semantic Area Profile Market Stats
+router.get('/areas/:filterType/:filterValue/stats', async (req, res) => {
+  try {
+    const { filterType, filterValue } = req.params;
+    const { minPrice, maxPrice } = req.query;
+    
+    if (!isValidFilterType(filterType)) {
+      return res.status(400).json({ error: `Invalid filter type: ${filterType}. Valid types: city, development, zone, region, subdivision` });
+    }
+    
+    const stats = await dbService.getMarketStatsForFilter(
+      filterType,
+      filterValue,
+      minPrice ? parseFloat(minPrice) : null, 
+      maxPrice ? parseFloat(maxPrice) : null
+    );
+    res.json(stats);
+  } catch (error) {
+    console.error('Error fetching market stats:', error);
+    res.status(500).json({ error: 'Failed to fetch market stats' });
+  }
+});
+
+// Semantic Area Profile Recent Sales
+router.get('/areas/:filterType/:filterValue/recent-sales', async (req, res) => {
+  try {
+    const { filterType, filterValue } = req.params;
+    const { limit = 50, minPrice, maxPrice } = req.query;
+    
+    if (!isValidFilterType(filterType)) {
+      return res.status(400).json({ error: `Invalid filter type: ${filterType}. Valid types: city, development, zone, region, subdivision` });
+    }
+    
+    const sales = await dbService.getRecentSalesForFilter(
+      filterType,
+      filterValue,
+      parseInt(limit),
+      minPrice ? parseFloat(minPrice) : null, 
+      maxPrice ? parseFloat(maxPrice) : null
+    );
+    res.json(sales);
+  } catch (error) {
+    console.error('Error fetching recent sales:', error);
+    res.status(500).json({ error: 'Failed to fetch recent sales' });
+  }
+});
+
+// Semantic Area Profile Under Contract
+router.get('/areas/:filterType/:filterValue/under-contract', async (req, res) => {
+  try {
+    const { filterType, filterValue } = req.params;
+    const { limit = 50, minPrice, maxPrice } = req.query;
+    
+    if (!isValidFilterType(filterType)) {
+      return res.status(400).json({ error: `Invalid filter type: ${filterType}. Valid types: city, development, zone, region, subdivision` });
+    }
+    
+    const contracts = await dbService.getUnderContractForFilter(
+      filterType,
+      filterValue,
+      parseInt(limit),
+      minPrice ? parseFloat(minPrice) : null, 
+      maxPrice ? parseFloat(maxPrice) : null
+    );
+    res.json(contracts);
+  } catch (error) {
+    console.error('Error fetching under contract listings:', error);
+    res.status(500).json({ error: 'Failed to fetch under contract listings' });
+  }
+});
+
+// Semantic Area Profile Active Listings
+router.get('/areas/:filterType/:filterValue/active-listings', async (req, res) => {
+  try {
+    const { filterType, filterValue } = req.params;
+    const { limit = 50, minPrice, maxPrice } = req.query;
+    
+    if (!isValidFilterType(filterType)) {
+      return res.status(400).json({ error: `Invalid filter type: ${filterType}. Valid types: city, development, zone, region, subdivision` });
+    }
+    
+    const listings = await dbService.getActiveListingsForFilter(
+      filterType,
+      filterValue,
+      parseInt(limit),
+      minPrice ? parseFloat(minPrice) : null, 
+      maxPrice ? parseFloat(maxPrice) : null
+    );
+    res.json(listings);
+  } catch (error) {
+    console.error('Error fetching active listings:', error);
+    res.status(500).json({ error: 'Failed to fetch active listings' });
+  }
+});
+
+// Semantic Area Profile Coming Soon
+router.get('/areas/:filterType/:filterValue/coming-soon', async (req, res) => {
+  try {
+    const { filterType, filterValue } = req.params;
+    const { limit = 50, minPrice, maxPrice } = req.query;
+    
+    if (!isValidFilterType(filterType)) {
+      return res.status(400).json({ error: `Invalid filter type: ${filterType}. Valid types: city, development, zone, region, subdivision` });
+    }
+    
+    const comingSoon = await dbService.getComingSoonForFilter(
+      filterType,
+      filterValue,
+      parseInt(limit),
+      minPrice ? parseFloat(minPrice) : null, 
+      maxPrice ? parseFloat(maxPrice) : null
+    );
+    res.json(comingSoon);
+  } catch (error) {
+    console.error('Error fetching coming soon listings:', error);
+    res.status(500).json({ error: 'Failed to fetch coming soon listings' });
+  }
+});
+
+// Semantic Area Profile Price Changes
+router.get('/areas/:filterType/:filterValue/price-changes', async (req, res) => {
+  try {
+    const { filterType, filterValue } = req.params;
+    const { limit = 50, minPrice, maxPrice } = req.query;
+    
+    if (!isValidFilterType(filterType)) {
+      return res.status(400).json({ error: `Invalid filter type: ${filterType}. Valid types: city, development, zone, region, subdivision` });
+    }
+    
+    const changes = await dbService.getPriceChangesForFilter(
+      filterType,
+      filterValue,
+      parseInt(limit),
+      minPrice ? parseFloat(minPrice) : null, 
+      maxPrice ? parseFloat(maxPrice) : null
+    );
+    res.json(changes);
+  } catch (error) {
+    console.error('Error fetching price changes:', error);
+    res.status(500).json({ error: 'Failed to fetch price changes' });
+  }
+});
+
+// Get available values for a specific filter type
+router.get('/areas/:filterType', async (req, res) => {
+  try {
+    const { filterType } = req.params;
+    
+    if (!isValidFilterType(filterType)) {
+      return res.status(400).json({ error: `Invalid filter type: ${filterType}. Valid types: city, development, zone, region, subdivision` });
+    }
+    
+    const values = await dbService.getAvailableFilterValues(filterType);
+    res.json(values);
+  } catch (error) {
+    console.error('Error fetching filter values:', error);
+    res.status(500).json({ error: 'Failed to fetch filter values' });
+  }
+});
+
+// Helper function to validate filter types
+function isValidFilterType(filterType) {
+  const validTypes = ['city', 'development', 'zone', 'region', 'subdivision'];
+  return validTypes.includes(filterType);
+}
+
+// ========== LEGACY AREA PROFILE ENDPOINTS (for backwards compatibility) ==========
 
 // Get area profile info
 router.get('/areas/:areaId', async (req, res) => {
@@ -42,7 +210,7 @@ router.get('/areas', async (req, res) => {
   }
 });
 
-// Area Profile Market Stats
+// Legacy Area Profile Market Stats
 router.get('/areas/:areaId/stats', async (req, res) => {
   try {
     const { areaId } = req.params;
