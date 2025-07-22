@@ -19,8 +19,10 @@ router.get('/areas/:filterType/:filterValue/stats', async (req, res) => {
   try {
     const { filterType, filterValue } = req.params;
     const { minPrice, maxPrice } = req.query;
+    console.log(`[API] Fetching stats for ${filterType}=${filterValue}, minPrice=${minPrice}, maxPrice=${maxPrice}`);
     
     if (!isValidFilterType(filterType)) {
+      console.warn(`[API] Invalid filter type requested: ${filterType}`);
       return res.status(400).json({ error: `Invalid filter type: ${filterType}. Valid types: city, development, zone, region, subdivision` });
     }
     
@@ -42,8 +44,10 @@ router.get('/areas/:filterType/:filterValue/recent-sales', async (req, res) => {
   try {
     const { filterType, filterValue } = req.params;
     const { limit = 50, minPrice, maxPrice } = req.query;
+    console.log(`[API] Fetching recent sales for ${filterType}=${filterValue}, limit=${limit}, minPrice=${minPrice}, maxPrice=${maxPrice}`);
     
     if (!isValidFilterType(filterType)) {
+      console.warn(`[API] Invalid filter type requested: ${filterType}`);
       return res.status(400).json({ error: `Invalid filter type: ${filterType}. Valid types: city, development, zone, region, subdivision` });
     }
     
@@ -66,8 +70,10 @@ router.get('/areas/:filterType/:filterValue/under-contract', async (req, res) =>
   try {
     const { filterType, filterValue } = req.params;
     const { limit = 50, minPrice, maxPrice } = req.query;
+    console.log(`[API] Fetching under contract for ${filterType}=${filterValue}, limit=${limit}, minPrice=${minPrice}, maxPrice=${maxPrice}`);
     
     if (!isValidFilterType(filterType)) {
+      console.warn(`[API] Invalid filter type requested: ${filterType}`);
       return res.status(400).json({ error: `Invalid filter type: ${filterType}. Valid types: city, development, zone, region, subdivision` });
     }
     
@@ -90,8 +96,10 @@ router.get('/areas/:filterType/:filterValue/active-listings', async (req, res) =
   try {
     const { filterType, filterValue } = req.params;
     const { limit = 50, minPrice, maxPrice } = req.query;
+    console.log(`[API] Fetching active listings for ${filterType}=${filterValue}, limit=${limit}, minPrice=${minPrice}, maxPrice=${maxPrice}`);
     
     if (!isValidFilterType(filterType)) {
+      console.warn(`[API] Invalid filter type requested: ${filterType}`);
       return res.status(400).json({ error: `Invalid filter type: ${filterType}. Valid types: city, development, zone, region, subdivision` });
     }
     
@@ -114,8 +122,10 @@ router.get('/areas/:filterType/:filterValue/coming-soon', async (req, res) => {
   try {
     const { filterType, filterValue } = req.params;
     const { limit = 50, minPrice, maxPrice } = req.query;
+    console.log(`[API] Fetching coming soon for ${filterType}=${filterValue}, limit=${limit}, minPrice=${minPrice}, maxPrice=${maxPrice}`);
     
     if (!isValidFilterType(filterType)) {
+      console.warn(`[API] Invalid filter type requested: ${filterType}`);
       return res.status(400).json({ error: `Invalid filter type: ${filterType}. Valid types: city, development, zone, region, subdivision` });
     }
     
@@ -138,8 +148,10 @@ router.get('/areas/:filterType/:filterValue/price-changes', async (req, res) => 
   try {
     const { filterType, filterValue } = req.params;
     const { limit = 50, minPrice, maxPrice } = req.query;
+    console.log(`[API] Fetching price changes for ${filterType}=${filterValue}, limit=${limit}, minPrice=${minPrice}, maxPrice=${maxPrice}`);
     
     if (!isValidFilterType(filterType)) {
+      console.warn(`[API] Invalid filter type requested: ${filterType}`);
       return res.status(400).json({ error: `Invalid filter type: ${filterType}. Valid types: city, development, zone, region, subdivision` });
     }
     
@@ -161,8 +173,10 @@ router.get('/areas/:filterType/:filterValue/price-changes', async (req, res) => 
 router.get('/areas/:filterType', async (req, res) => {
   try {
     const { filterType } = req.params;
+    console.log(`[API] Fetching available values for filter type: ${filterType}`);
     
     if (!isValidFilterType(filterType)) {
+      console.warn(`[API] Invalid filter type requested: ${filterType}`);
       return res.status(400).json({ error: `Invalid filter type: ${filterType}. Valid types: city, development, zone, region, subdivision` });
     }
     

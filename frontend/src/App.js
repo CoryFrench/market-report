@@ -10,11 +10,20 @@ function App() {
     <Router basename="/area-profile">
       <div className="min-h-screen bg-gray-50">
         <Routes>
-          {/* Default route - redirect to Jupiter as fallback */}
-          <Route path="/" element={<Navigate to="/jupiter" replace />} />
+          {/* Default route - redirect to a default area */}
+          <Route path="/" element={<Navigate to="/zone/jupiter-island" replace />} />
           
-          {/* Area profile routes */}
-          <Route path="/:areaId" element={<AreaProfile apiBaseUrl={API_BASE_URL} />} />
+          {/* New semantic area profile route */}
+          <Route 
+            path="/:filterType/:filterValue" 
+            element={<AreaProfile apiBaseUrl={API_BASE_URL} />} 
+          />
+
+          {/* Legacy area profile route for backwards compatibility */}
+          <Route 
+            path="/:areaId" 
+            element={<AreaProfile apiBaseUrl={API_BASE_URL} />} 
+          />
           
           {/* 404 for invalid areas */}
           <Route path="*" element={<AreaNotFound />} />

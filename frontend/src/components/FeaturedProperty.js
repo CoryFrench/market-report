@@ -208,7 +208,7 @@ function FeaturedProperty({ property }) {
                       colSpan="2"
                     >
                       <a 
-                        href={`#property-${property.id}`} 
+                        href={`https://waterfront-properties.com/listing/${property.id.toLowerCase()}`} 
                         target="_blank" 
                         rel="noopener noreferrer"
                       >

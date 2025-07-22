@@ -6,7 +6,7 @@ import FeaturedProperty from './FeaturedProperty';
 import PropertyTable from './PropertyTable';
 
 const AreaProfile = ({ apiBaseUrl }) => {
-  const { areaId } = useParams();
+  const { areaId, filterType, filterValue } = useParams();
   const [areaProfile, setAreaProfile] = useState(null);
   const [activePriceRange, setActivePriceRange] = useState('1m-plus');
   const [marketStats, setMarketStats] = useState({});
@@ -40,32 +40,13 @@ const AreaProfile = ({ apiBaseUrl }) => {
     }
   };
 
-  // Fetch area profile info
-  const fetchAreaProfile = async (areaId) => {
-    try {
-      const response = await fetch(`${apiBaseUrl}/areas/${areaId}`);
-      if (!response.ok) {
-        if (response.status === 404) {
-          throw new Error('Area profile not found');
-        }
-        throw new Error('Failed to fetch area profile');
-      }
-      const profile = await response.json();
-      setAreaProfile(profile);
-      return profile;
-    } catch (error) {
-      console.error('Error fetching area profile:', error);
-      throw error;
-    }
-  };
-
   // Fetch all data for the area and price range
-  const fetchAreaData = async (areaId, priceRange) => {
+  const fetchData = async () => {
     try {
       setLoading(true);
       setError(null);
 
-      const priceParams = getPriceRangeParams(priceRange);
+      const priceParams = getPriceRangeParams(activePriceRange);
 
       // Build query parameters
       const buildQueryParams = (baseParams = {}) => {
@@ -76,9 +57,39 @@ const AreaProfile = ({ apiBaseUrl }) => {
         return params.toString();
       };
 
-      // Fetch area profile and all data in parallel
+      let baseUrl;
+      let profile;
+
+      if (filterType && filterValue) {
+        // New semantic URL structure: /:filterType/:filterValue
+        baseUrl = `${apiBaseUrl}/areas/${filterType}/${filterValue}`;
+        // Create a profile object from the URL params for display
+        const formattedName = filterValue
+          .split('-')
+          .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+          .join(' ');
+        profile = { name: formattedName, id: filterValue };
+        setAreaProfile(profile);
+
+      } else if (areaId) {
+        // Legacy URL structure: /:areaId
+        baseUrl = `${apiBaseUrl}/areas/${areaId}`;
+        const profileResponse = await fetch(`${apiBaseUrl}/areas/${areaId}`);
+        if (!profileResponse.ok) {
+          if (profileResponse.status === 404) throw new Error('Area profile not found');
+          throw new Error('Failed to fetch area profile');
+        }
+        profile = await profileResponse.json();
+        setAreaProfile(profile);
+
+      } else {
+        setError('Area identifier is missing from the URL.');
+        setLoading(false);
+        return;
+      }
+
+      // Fetch all data endpoints in parallel
       const [
-        areaProfileData,
         statsResponse,
         salesResponse,
         contractResponse,
@@ -86,28 +97,22 @@ const AreaProfile = ({ apiBaseUrl }) => {
         comingSoonResponse,
         priceChangesResponse
       ] = await Promise.all([
-        fetchAreaProfile(areaId),
-        fetch(`${apiBaseUrl}/areas/${areaId}/stats?${buildQueryParams()}`),
-        fetch(`${apiBaseUrl}/areas/${areaId}/recent-sales?${buildQueryParams({ limit: 50 })}`),
-        fetch(`${apiBaseUrl}/areas/${areaId}/under-contract?${buildQueryParams({ limit: 50 })}`),
-        fetch(`${apiBaseUrl}/areas/${areaId}/active-listings?${buildQueryParams({ limit: 50 })}`),
-        fetch(`${apiBaseUrl}/areas/${areaId}/coming-soon?${buildQueryParams({ limit: 50 })}`),
-        fetch(`${apiBaseUrl}/areas/${areaId}/price-changes?${buildQueryParams({ limit: 50 })}`)
+        fetch(`${baseUrl}/stats?${buildQueryParams()}`),
+        fetch(`${baseUrl}/recent-sales?${buildQueryParams({ limit: 50 })}`),
+        fetch(`${baseUrl}/under-contract?${buildQueryParams({ limit: 50 })}`),
+        fetch(`${baseUrl}/active-listings?${buildQueryParams({ limit: 50 })}`),
+        fetch(`${baseUrl}/coming-soon?${buildQueryParams({ limit: 50 })}`),
+        fetch(`${baseUrl}/price-changes?${buildQueryParams({ limit: 50 })}`)
       ]);
 
       // Check if all requests were successful
-      if (!statsResponse.ok || !salesResponse.ok || !contractResponse.ok || 
-          !listingsResponse.ok || !comingSoonResponse.ok || !priceChangesResponse.ok) {
-        throw new Error('Failed to fetch area data');
+      const responses = [statsResponse, salesResponse, contractResponse, listingsResponse, comingSoonResponse, priceChangesResponse];
+      if (responses.some(res => !res.ok)) {
+        throw new Error('Failed to fetch one or more area data endpoints.');
       }
 
       // Parse all responses
-      const stats = await statsResponse.json();
-      const sales = await salesResponse.json();
-      const contracts = await contractResponse.json();
-      const listings = await listingsResponse.json();
-      const comingSoonData = await comingSoonResponse.json();
-      const priceChangesData = await priceChangesResponse.json();
+      const [stats, sales, contracts, listings, comingSoonData, priceChangesData] = await Promise.all(responses.map(res => res.json()));
 
       // Update state
       setMarketStats(stats);
@@ -125,12 +130,10 @@ const AreaProfile = ({ apiBaseUrl }) => {
     }
   };
 
-  // Load data when area or price range changes
+  // Load data when area URL params or price range change
   useEffect(() => {
-    if (areaId) {
-      fetchAreaData(areaId, activePriceRange);
-    }
-  }, [areaId, activePriceRange, apiBaseUrl]);
+    fetchData();
+  }, [areaId, filterType, filterValue, activePriceRange, apiBaseUrl]);
 
   // Get featured property (first active listing)
   const featuredProperty = activeListings.length > 0 ? activeListings[0] : null;
@@ -153,7 +156,7 @@ const AreaProfile = ({ apiBaseUrl }) => {
           <div className="text-red-600 text-xl mb-4">⚠️ Error</div>
           <p className="text-gray-600 mb-4">{error}</p>
           <button
-            onClick={() => fetchAreaData(areaId, activePriceRange)}
+            onClick={fetchData}
             className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
           >
             Retry
@@ -168,7 +171,7 @@ const AreaProfile = ({ apiBaseUrl }) => {
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <div className="text-red-600 text-xl mb-4">⚠️ Area Not Found</div>
-          <p className="text-gray-600 mb-4">The area profile "{areaId}" does not exist.</p>
+          <p className="text-gray-600 mb-4">The area profile "{areaId || filterValue}" does not exist or could not be loaded.</p>
         </div>
       </div>
     );

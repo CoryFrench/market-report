@@ -32,6 +32,12 @@ class DatabaseService {
     }).join(' ');
   }
 
+  // Utility function to convert kebab-case to Title Case
+  kebabToTitleCase(str) {
+    if (!str || typeof str !== 'string') return str;
+    return str.split('-').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
+  }
+
   async query(text, params) {
     try {
       const result = await this.pool.query(text, params);
@@ -174,12 +180,18 @@ class DatabaseService {
     let whereClause = '';
     let params = [];
     let paramCount = 0;
+    let normalizedValue = filterValue;
+
+    // Normalize kebab-case for specific filter types that use it
+    if (['zone', 'development', 'subdivision', 'region', 'city'].includes(filterType)) {
+      normalizedValue = this.kebabToTitleCase(filterValue);
+    }
 
     switch (filterType) {
       case 'city':
         paramCount++;
         whereClause += ` AND mls.city = $${paramCount}`;
-        params.push(this.getCityFilter(filterValue));
+        params.push(normalizedValue);
         break;
 
       case 'development':
@@ -209,7 +221,7 @@ class DatabaseService {
         } else if (filterType === 'region') {
           whereClause += ` AND dd.region_name = $${paramCount}`;
         }
-        params.push(filterValue);
+        params.push(normalizedValue);
         break;
 
       default:
