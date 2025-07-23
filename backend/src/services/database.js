@@ -243,38 +243,20 @@ class DatabaseService {
     let params = [...semanticQuery.params];
     let paramCount = semanticQuery.paramCount;
 
-    // Price filtering for different statuses
-    let priceFilterClause = "";
-    if (minPrice || maxPrice) {
-      let priceConditions = [];
-      
-      if (minPrice && maxPrice) {
-        paramCount++;
-        paramCount++;
-        priceConditions.push(`(
-          (mls.status IN ('Active', 'Active Under Contract', 'Pending', 'Coming Soon') AND mls.list_price IS NOT NULL AND mls.list_price != '' AND mls.list_price::numeric BETWEEN $${paramCount-1} AND $${paramCount}) OR
-          (mls.status = 'Closed' AND mls.sold_price IS NOT NULL AND mls.sold_price != '' AND mls.sold_price::numeric BETWEEN $${paramCount-1} AND $${paramCount})
-        )`);
-        params.push(minPrice, maxPrice);
-      } else if (minPrice) {
-        paramCount++;
-        priceConditions.push(`(
-          (mls.status IN ('Active', 'Active Under Contract', 'Pending', 'Coming Soon') AND mls.list_price IS NOT NULL AND mls.list_price != '' AND mls.list_price::numeric >= $${paramCount}) OR
-          (mls.status = 'Closed' AND mls.sold_price IS NOT NULL AND mls.sold_price != '' AND mls.sold_price::numeric >= $${paramCount})
-        )`);
-        params.push(minPrice);
-      } else if (maxPrice) {
-        paramCount++;
-        priceConditions.push(`(
-          (mls.status IN ('Active', 'Active Under Contract', 'Pending', 'Coming Soon') AND mls.list_price IS NOT NULL AND mls.list_price != '' AND mls.list_price::numeric <= $${paramCount}) OR
-          (mls.status = 'Closed' AND mls.sold_price IS NOT NULL AND mls.sold_price != '' AND mls.sold_price::numeric <= $${paramCount})
-        )`);
-        params.push(maxPrice);
-      }
-      
-      if (priceConditions.length > 0) {
-        priceFilterClause = " AND " + priceConditions.join(" AND ");
-      }
+    let listPriceFilter = '';
+    let soldPriceFilter = '';
+
+    if (minPrice) {
+      paramCount++;
+      listPriceFilter += ` AND list_price IS NOT NULL AND list_price != '' AND list_price::numeric >= $${paramCount}`;
+      soldPriceFilter += ` AND sold_price IS NOT NULL AND sold_price != '' AND sold_price::numeric >= $${paramCount}`;
+      params.push(minPrice);
+    }
+    if (maxPrice) {
+      paramCount++;
+      listPriceFilter += ` AND list_price IS NOT NULL AND list_price != '' AND list_price::numeric <= $${paramCount}`;
+      soldPriceFilter += ` AND sold_price IS NOT NULL AND sold_price != '' AND sold_price::numeric <= $${paramCount}`;
+      params.push(maxPrice);
     }
 
     const query = `
@@ -288,7 +270,6 @@ class DatabaseService {
         ${semanticQuery.joinClause}
         WHERE mls.listing_id IS NOT NULL
           ${semanticQuery.whereClause}
-          ${priceFilterClause}
       ),
       calculated_stats AS (
         SELECT *,
@@ -305,16 +286,16 @@ class DatabaseService {
         WHERE rn = 1
       )
       SELECT 
-        COUNT(CASE WHEN status = 'Active' THEN 1 END) as active_listings,
-        COUNT(CASE WHEN status = 'Closed' AND ${this.castDate('sold_date')} >= CURRENT_DATE - INTERVAL '30 days' THEN 1 END) as sales_last_30_days,
-        COUNT(CASE WHEN status IN ('Active Under Contract', 'Pending') THEN 1 END) as under_contract,
-        COUNT(CASE WHEN status = 'Coming Soon' THEN 1 END) as coming_soon,
-        COUNT(CASE WHEN status = 'Active' AND ${this.castTimestamp('price_change_timestamp')} >= CURRENT_DATE - INTERVAL '30 days' AND prior_list_price IS NOT NULL AND prior_list_price != '' AND prior_list_price != list_price THEN 1 END) as price_changes_last_30_days,
-        AVG(CASE WHEN status = 'Active' AND calculated_days_on_market > 0 THEN calculated_days_on_market END) as avg_days_on_market,
-        AVG(CASE WHEN status = 'Closed' AND ${this.castDate('sold_date')} >= CURRENT_DATE - INTERVAL '30 days' AND sold_price IS NOT NULL AND sold_price != '' THEN sold_price::numeric END) as avg_sold_price,
-        AVG(CASE WHEN status = 'Active' AND list_price IS NOT NULL AND list_price != '' THEN list_price::numeric END) as avg_list_price,
-        MIN(CASE WHEN status = 'Active' AND list_price IS NOT NULL AND list_price != '' THEN list_price::numeric END) as min_list_price,
-        MAX(CASE WHEN status = 'Active' AND list_price IS NOT NULL AND list_price != '' THEN list_price::numeric END) as max_list_price
+        COUNT(CASE WHEN status = 'Active' ${listPriceFilter} THEN 1 END) as active_listings,
+        COUNT(CASE WHEN status = 'Closed' AND ${this.castDate('sold_date')} >= CURRENT_DATE - INTERVAL '30 days' ${soldPriceFilter} THEN 1 END) as sales_last_30_days,
+        COUNT(CASE WHEN status IN ('Active Under Contract', 'Pending') ${listPriceFilter} THEN 1 END) as under_contract,
+        COUNT(CASE WHEN status = 'Coming Soon' ${listPriceFilter} THEN 1 END) as coming_soon,
+        COUNT(CASE WHEN status = 'Active' AND ${this.castTimestamp('price_change_timestamp')} >= CURRENT_DATE - INTERVAL '30 days' AND prior_list_price IS NOT NULL AND prior_list_price != '' AND prior_list_price != list_price ${listPriceFilter} THEN 1 END) as price_changes_last_30_days,
+        AVG(CASE WHEN status = 'Active' AND calculated_days_on_market > 0 ${listPriceFilter} THEN calculated_days_on_market END) as avg_days_on_market,
+        AVG(CASE WHEN status = 'Closed' AND ${this.castDate('sold_date')} >= CURRENT_DATE - INTERVAL '30 days' AND sold_price IS NOT NULL AND sold_price != '' ${soldPriceFilter} THEN sold_price::numeric END) as avg_sold_price,
+        AVG(CASE WHEN status = 'Active' AND list_price IS NOT NULL AND list_price != '' ${listPriceFilter} THEN list_price::numeric END) as avg_list_price,
+        MIN(CASE WHEN status = 'Active' AND list_price IS NOT NULL AND list_price != '' ${listPriceFilter} THEN list_price::numeric END) as min_list_price,
+        MAX(CASE WHEN status = 'Active' AND list_price IS NOT NULL AND list_price != '' ${listPriceFilter} THEN list_price::numeric END) as max_list_price
       FROM calculated_stats
     `;
 
@@ -346,13 +327,13 @@ class DatabaseService {
     // Add user-specified price filtering
     if (minPrice) {
       paramCount++;
-      additionalWhere += ` AND mls.list_price IS NOT NULL AND mls.list_price != '' AND mls.list_price::numeric >= $${paramCount}`;
+      additionalWhere += ` AND list_price IS NOT NULL AND list_price != '' AND list_price::numeric >= $${paramCount}`;
       params.push(minPrice);
     }
 
     if (maxPrice) {
       paramCount++;
-      additionalWhere += ` AND mls.list_price IS NOT NULL AND mls.list_price != '' AND mls.list_price::numeric <= $${paramCount}`;
+      additionalWhere += ` AND list_price IS NOT NULL AND list_price != '' AND list_price::numeric <= $${paramCount}`;
       params.push(maxPrice);
     }
 
@@ -366,13 +347,13 @@ class DatabaseService {
                ) as rn
         FROM mls.beaches_residential mls
         ${semanticQuery.joinClause}
-        WHERE mls.listing_id IS NOT NULL 
-          AND mls.status = 'Active'
+        WHERE mls.listing_id IS NOT NULL
           ${semanticQuery.whereClause}
-          ${additionalWhere}
       )
       SELECT * FROM latest_listings 
-      WHERE rn = 1
+      WHERE rn = 1 
+        AND status = 'Active'
+        ${additionalWhere}
       ORDER BY ${this.castDate('listing_date')} DESC NULLS LAST
       LIMIT $${paramCount}
     `;
@@ -392,13 +373,13 @@ class DatabaseService {
     // Add user-specified price filtering (on sold price for sales)
     if (minPrice) {
       paramCount++;
-      additionalWhere += ` AND mls.sold_price IS NOT NULL AND mls.sold_price != '' AND mls.sold_price::numeric >= $${paramCount}`;
+      additionalWhere += ` AND sold_price IS NOT NULL AND sold_price != '' AND sold_price::numeric >= $${paramCount}`;
       params.push(minPrice);
     }
 
     if (maxPrice) {
       paramCount++;
-      additionalWhere += ` AND mls.sold_price IS NOT NULL AND mls.sold_price != '' AND mls.sold_price::numeric <= $${paramCount}`;
+      additionalWhere += ` AND sold_price IS NOT NULL AND sold_price != '' AND sold_price::numeric <= $${paramCount}`;
       params.push(maxPrice);
     }
 
@@ -413,13 +394,13 @@ class DatabaseService {
         FROM mls.beaches_residential mls
         ${semanticQuery.joinClause}
         WHERE mls.listing_id IS NOT NULL
-          AND mls.status = 'Closed' 
-          AND ${this.castDate('sold_date')} >= CURRENT_DATE - INTERVAL '30 days'
           ${semanticQuery.whereClause}
-          ${additionalWhere}
       )
       SELECT * FROM latest_listings 
       WHERE rn = 1
+        AND status = 'Closed' 
+        AND ${this.castDate('sold_date')} >= CURRENT_DATE - INTERVAL '30 days'
+        ${additionalWhere}
       ORDER BY ${this.castDate('sold_date')} DESC NULLS LAST
       LIMIT $${paramCount}
     `;
@@ -438,13 +419,13 @@ class DatabaseService {
 
     if (minPrice) {
       paramCount++;
-      additionalWhere += ` AND mls.list_price IS NOT NULL AND mls.list_price != '' AND mls.list_price::numeric >= $${paramCount}`;
+      additionalWhere += ` AND list_price IS NOT NULL AND list_price != '' AND list_price::numeric >= $${paramCount}`;
       params.push(minPrice);
     }
 
     if (maxPrice) {
       paramCount++;
-      additionalWhere += ` AND mls.list_price IS NOT NULL AND mls.list_price != '' AND mls.list_price::numeric <= $${paramCount}`;
+      additionalWhere += ` AND list_price IS NOT NULL AND list_price != '' AND list_price::numeric <= $${paramCount}`;
       params.push(maxPrice);
     }
 
@@ -459,12 +440,12 @@ class DatabaseService {
         FROM mls.beaches_residential mls
         ${semanticQuery.joinClause}
         WHERE mls.listing_id IS NOT NULL
-          AND mls.status IN ('Active Under Contract', 'Pending')
           ${semanticQuery.whereClause}
-          ${additionalWhere}
       )
       SELECT * FROM latest_listings 
       WHERE rn = 1
+        AND status IN ('Active Under Contract', 'Pending')
+        ${additionalWhere}
       ORDER BY ${this.castDate('under_contract_date')} DESC NULLS LAST
       LIMIT $${paramCount}
     `;
@@ -483,13 +464,13 @@ class DatabaseService {
 
     if (minPrice) {
       paramCount++;
-      additionalWhere += ` AND mls.list_price IS NOT NULL AND mls.list_price != '' AND mls.list_price::numeric >= $${paramCount}`;
+      additionalWhere += ` AND list_price IS NOT NULL AND list_price != '' AND list_price::numeric >= $${paramCount}`;
       params.push(minPrice);
     }
 
     if (maxPrice) {
       paramCount++;
-      additionalWhere += ` AND mls.list_price IS NOT NULL AND mls.list_price != '' AND mls.list_price::numeric <= $${paramCount}`;
+      additionalWhere += ` AND list_price IS NOT NULL AND list_price != '' AND list_price::numeric <= $${paramCount}`;
       params.push(maxPrice);
     }
 
@@ -504,12 +485,12 @@ class DatabaseService {
         FROM mls.beaches_residential mls
         ${semanticQuery.joinClause}
         WHERE mls.listing_id IS NOT NULL
-          AND mls.status = 'Coming Soon'
           ${semanticQuery.whereClause}
-          ${additionalWhere}
       )
       SELECT * FROM latest_listings 
       WHERE rn = 1
+        AND status = 'Coming Soon'
+        ${additionalWhere}
       ORDER BY ${this.castDate('listing_date')} DESC NULLS LAST
       LIMIT $${paramCount}
     `;
@@ -528,13 +509,13 @@ class DatabaseService {
 
     if (minPrice) {
       paramCount++;
-      additionalWhere += ` AND mls.list_price IS NOT NULL AND mls.list_price != '' AND mls.list_price::numeric >= $${paramCount}`;
+      additionalWhere += ` AND list_price IS NOT NULL AND list_price != '' AND list_price::numeric >= $${paramCount}`;
       params.push(minPrice);
     }
 
     if (maxPrice) {
       paramCount++;
-      additionalWhere += ` AND mls.list_price IS NOT NULL AND mls.list_price != '' AND mls.list_price::numeric <= $${paramCount}`;
+      additionalWhere += ` AND list_price IS NOT NULL AND list_price != '' AND list_price::numeric <= $${paramCount}`;
       params.push(maxPrice);
     }
 
@@ -549,19 +530,19 @@ class DatabaseService {
         FROM mls.beaches_residential mls
         ${semanticQuery.joinClause}
         WHERE mls.listing_id IS NOT NULL
-          AND mls.status = 'Active' 
-          AND ${this.castTimestamp('price_change_timestamp')} >= CURRENT_DATE - INTERVAL '30 days'
-          AND mls.prior_list_price IS NOT NULL 
-          AND mls.prior_list_price != ''
-          AND mls.prior_list_price != mls.list_price
           ${semanticQuery.whereClause}
-          ${additionalWhere}
       )
       SELECT *, 
              prior_list_price as previousPrice, 
              list_price as currentPrice
       FROM latest_listings 
       WHERE rn = 1
+        AND status = 'Active' 
+        AND ${this.castTimestamp('price_change_timestamp')} >= CURRENT_DATE - INTERVAL '30 days'
+        AND prior_list_price IS NOT NULL 
+        AND prior_list_price != ''
+        AND prior_list_price != list_price
+        ${additionalWhere}
       ORDER BY ${this.castTimestamp('price_change_timestamp')} DESC NULLS LAST
       LIMIT $${paramCount}
     `;
