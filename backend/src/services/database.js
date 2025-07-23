@@ -168,7 +168,8 @@ class DatabaseService {
       listingOffice: row.listingofficename,
       latitude: parseFloat(row.geo_lat) || 0,
       longitude: parseFloat(row.geo_lon) || 0,
-      lastUpdated: row.timestamp
+      lastUpdated: row.timestamp,
+      internal_listing_id: row.internal_listing_id
     };
   }
 

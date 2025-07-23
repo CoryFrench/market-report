@@ -1,6 +1,37 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 
-function FeaturedProperty({ property }) {
+function FeaturedProperty({ property, apiBaseUrl }) {
+  const [imageUrl, setImageUrl] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchPhoto = async () => {
+      if (!property || !property.internal_listing_id) {
+        setLoading(false);
+        return;
+      }
+
+      try {
+        setLoading(true);
+        const response = await fetch(`${apiBaseUrl}/fetch-photo?listingId=${property.internal_listing_id}`);
+        
+        if (!response.ok) {
+          throw new Error('Failed to fetch photo');
+        }
+        
+        const data = await response.json();
+        setImageUrl(data.location);
+      } catch (error) {
+        console.error('Error fetching featured property photo:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchPhoto();
+  }, [property, apiBaseUrl]);
+
+
   if (!property) return null;
 
   const formatPrice = (price) => {
@@ -68,10 +99,27 @@ function FeaturedProperty({ property }) {
                     justifyContent: 'center'
                   }}
                 >
-                  <div style={{ textAlign: 'center', color: '#666' }}>
-                    <div style={{ fontSize: '48px', marginBottom: '10px' }}>🏠</div>
-                    <div style={{ fontSize: '14px' }}>Property Image</div>
-                  </div>
+                  {loading ? (
+                    <div style={{ textAlign: 'center', color: '#666' }}>
+                      <div style={{ fontSize: '24px', marginBottom: '10px' }}>⏳</div>
+                      <div style={{ fontSize: '14px' }}>Loading Image...</div>
+                    </div>
+                  ) : imageUrl ? (
+                    <img 
+                      src={imageUrl} 
+                      alt={`Featured property: ${property.address}`} 
+                      style={{ 
+                        maxWidth: '100%', 
+                        maxHeight: '100%', 
+                        objectFit: 'cover' 
+                      }} 
+                    />
+                  ) : (
+                    <div style={{ textAlign: 'center', color: '#666' }}>
+                      <div style={{ fontSize: '48px', marginBottom: '10px' }}>🏠</div>
+                      <div style={{ fontSize: '14px' }}>No Image Available</div>
+                    </div>
+                  )}
                 </div>
               </td>
               <td style={{ width: '50%', backgroundColor: '#eee' }}>

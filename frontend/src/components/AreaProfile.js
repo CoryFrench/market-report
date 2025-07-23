@@ -197,7 +197,7 @@ const AreaProfile = ({ apiBaseUrl }) => {
         />
         
         {featuredProperty && (
-          <FeaturedProperty property={featuredProperty} />
+          <FeaturedProperty property={featuredProperty} apiBaseUrl={apiBaseUrl} />
         )}
         
         <div className="mt-4 sm:mt-8 space-y-4 sm:space-y-8">

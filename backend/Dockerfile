@@ -4,7 +4,7 @@ FROM node:18-alpine
 WORKDIR /app
 
 # Install system dependencies if needed
-RUN apk add --no-cache curl
+RUN apk add --no-cache curl python3 make g++
 
 # Copy package files first for better caching
 COPY package*.json ./

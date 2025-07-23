@@ -1,4 +1,5 @@
 const express = require('express');
+const rets = require('rets-client');
 const DatabaseService = require('../services/database');
 const { getAreaProfile, getAllAreaProfiles, isValidAreaId } = require('../config/areas');
 
@@ -193,6 +194,52 @@ function isValidFilterType(filterType) {
   const validTypes = ['city', 'development', 'zone', 'region', 'subdivision'];
   return validTypes.includes(filterType);
 }
+
+// ========== PHOTO FETCHING ENDPOINT ==========
+
+router.get('/fetch-photo', async (req, res) => {
+    const { listingId } = req.query;
+    const index = req.query.index || 0; // Default to first image
+    
+    if (!listingId) {
+        return res.status(400).json({ error: 'Listing ID is required' });
+    }
+    
+    try {
+        // RETS configuration
+        const config = {
+            loginUrl: 'http://retsgw.flexmls.com/rets2_3/Login',
+            username: process.env.RETS_USERNAME,
+            password: process.env.RETS_PASSWORD,
+            version: 'RETS/1.7.2',
+            userAgent: 'YourApp/1.0',
+            method: 'GET'
+        };
+        
+        // Use auto-logout client for connection management
+        const client = await rets.getAutoLogoutClient(config, async (client) => {
+            const response = await client.objects.getObjects(
+                'Property',        // Resource type
+                'HiRes',          // Object type (high resolution)
+                `${listingId}:${index}`, // Resource ID with index
+                {
+                    alwaysGroupObjects: true,
+                    location: 1       // Return URL instead of binary data
+                }
+            );
+            
+            if (response.objects && response.objects.length > 0) {
+                const location = response.objects[0].headerInfo.location;
+                res.json({ location });
+            } else {
+                res.status(404).json({ error: 'Photo not found' });
+            }
+        });
+    } catch (error) {
+        console.error('Error fetching photo:', error);
+        res.status(500).json({ error: 'Failed to fetch photo' });
+    }
+});
 
 // ========== LEGACY AREA PROFILE ENDPOINTS (for backwards compatibility) ==========
 
