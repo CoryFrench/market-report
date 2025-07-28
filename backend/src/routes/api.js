@@ -1,7 +1,7 @@
 const express = require('express');
 const rets = require('rets-client');
 const DatabaseService = require('../services/database');
-const { getAreaProfile, getAllAreaProfiles, isValidAreaId } = require('../config/areas');
+const { getAreaProfile, getAllAreaProfiles, isValidAreaId, getAreaProfileWithDatabase } = require('../config/areas');
 
 const router = express.Router();
 
@@ -247,7 +247,9 @@ router.get('/fetch-photo', async (req, res) => {
 router.get('/areas/:areaId', async (req, res) => {
   try {
     const { areaId } = req.params;
-    const areaProfile = getAreaProfile(areaId);
+    const { expectedType } = req.query;
+    
+    const areaProfile = await getAreaProfileWithDatabase(areaId, dbService, expectedType);
     
     if (!areaProfile) {
       return res.status(404).json({ error: 'Area profile not found' });

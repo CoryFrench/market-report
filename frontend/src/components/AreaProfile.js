@@ -1,12 +1,19 @@
 import React, { useState, useEffect } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useLocation } from 'react-router-dom';
 import AreaHeader from './AreaHeader';
 import Dashboard from './Dashboard';
 import FeaturedProperty from './FeaturedProperty';
 import PropertyTable from './PropertyTable';
 
 const AreaProfile = ({ apiBaseUrl }) => {
-  const { areaId, filterType, filterValue } = useParams();
+  const { areaId } = useParams();
+  const location = useLocation();
+  
+  // Extract type from pathname (e.g., "/city/jupiter" -> "city")
+  console.log('Current pathname:', location.pathname);
+  console.log('Path split result:', location.pathname.split('/'));
+  const type = location.pathname.split('/')[1];
+  console.log('Extracted type:', type);
   const [areaProfile, setAreaProfile] = useState(null);
   const [activePriceRange, setActivePriceRange] = useState('1m-plus');
   const [marketStats, setMarketStats] = useState({});
@@ -40,13 +47,44 @@ const AreaProfile = ({ apiBaseUrl }) => {
     }
   };
 
+  // Fetch area profile info
+  const fetchAreaProfile = async (areaId, expectedType) => {
+    try {
+      console.log('fetchAreaProfile called with:', { areaId, expectedType });
+      const url = expectedType 
+        ? `${apiBaseUrl}/areas/${areaId}?expectedType=${expectedType}`
+        : `${apiBaseUrl}/areas/${areaId}`;
+      const response = await fetch(url);
+      if (!response.ok) {
+        if (response.status === 404) {
+          throw new Error('Area profile not found');
+        }
+        throw new Error('Failed to fetch area profile');
+      }
+      const profile = await response.json();
+      console.log('Area profile response:', profile);
+      
+      // Validate that the URL type matches the actual area type
+      if (expectedType && profile.type !== expectedType) {
+        console.error('Type mismatch:', { areaId, expectedType, actualType: profile.type });
+        throw new Error(`Invalid URL: Area "${areaId}" is of type "${profile.type}", not "${expectedType}"`);
+      }
+      
+      setAreaProfile(profile);
+      return profile;
+    } catch (error) {
+      console.error('Error fetching area profile:', error);
+      throw error;
+    }
+  };
+
   // Fetch all data for the area and price range
-  const fetchData = async () => {
+  const fetchAreaData = async (areaId, priceRange, expectedType) => {
     try {
       setLoading(true);
       setError(null);
 
-      const priceParams = getPriceRangeParams(activePriceRange);
+      const priceParams = getPriceRangeParams(priceRange);
 
       // Build query parameters
       const buildQueryParams = (baseParams = {}) => {
@@ -57,39 +95,9 @@ const AreaProfile = ({ apiBaseUrl }) => {
         return params.toString();
       };
 
-      let baseUrl;
-      let profile;
-
-      if (filterType && filterValue) {
-        // New semantic URL structure: /:filterType/:filterValue
-        baseUrl = `${apiBaseUrl}/areas/${filterType}/${filterValue}`;
-        // Create a profile object from the URL params for display
-        const formattedName = filterValue
-          .split('-')
-          .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-          .join(' ');
-        profile = { name: formattedName, id: filterValue };
-        setAreaProfile(profile);
-
-      } else if (areaId) {
-        // Legacy URL structure: /:areaId
-        baseUrl = `${apiBaseUrl}/areas/${areaId}`;
-        const profileResponse = await fetch(`${apiBaseUrl}/areas/${areaId}`);
-        if (!profileResponse.ok) {
-          if (profileResponse.status === 404) throw new Error('Area profile not found');
-          throw new Error('Failed to fetch area profile');
-        }
-        profile = await profileResponse.json();
-        setAreaProfile(profile);
-
-      } else {
-        setError('Area identifier is missing from the URL.');
-        setLoading(false);
-        return;
-      }
-
-      // Fetch all data endpoints in parallel
+      // Fetch area profile and all data in parallel
       const [
+        areaProfileData,
         statsResponse,
         salesResponse,
         contractResponse,
@@ -97,12 +105,13 @@ const AreaProfile = ({ apiBaseUrl }) => {
         comingSoonResponse,
         priceChangesResponse
       ] = await Promise.all([
-        fetch(`${baseUrl}/stats?${buildQueryParams()}`),
-        fetch(`${baseUrl}/recent-sales?${buildQueryParams({ limit: 50 })}`),
-        fetch(`${baseUrl}/under-contract?${buildQueryParams({ limit: 50 })}`),
-        fetch(`${baseUrl}/active-listings?${buildQueryParams({ limit: 50 })}`),
-        fetch(`${baseUrl}/coming-soon?${buildQueryParams({ limit: 50 })}`),
-        fetch(`${baseUrl}/price-changes?${buildQueryParams({ limit: 50 })}`)
+        fetchAreaProfile(areaId, expectedType),
+        fetch(`${apiBaseUrl}/areas/${areaId}/stats?${buildQueryParams()}`),
+        fetch(`${apiBaseUrl}/areas/${areaId}/recent-sales?${buildQueryParams({ limit: 50 })}`),
+        fetch(`${apiBaseUrl}/areas/${areaId}/under-contract?${buildQueryParams({ limit: 50 })}`),
+        fetch(`${apiBaseUrl}/areas/${areaId}/active-listings?${buildQueryParams({ limit: 50 })}`),
+        fetch(`${apiBaseUrl}/areas/${areaId}/coming-soon?${buildQueryParams({ limit: 50 })}`),
+        fetch(`${apiBaseUrl}/areas/${areaId}/price-changes?${buildQueryParams({ limit: 50 })}`)
       ]);
 
       // Check if all requests were successful
@@ -132,8 +141,8 @@ const AreaProfile = ({ apiBaseUrl }) => {
 
   // Load data when area URL params or price range change
   useEffect(() => {
-    fetchData();
-  }, [areaId, filterType, filterValue, activePriceRange, apiBaseUrl]);
+    fetchAreaData(areaId, activePriceRange, type);
+  }, [areaId, type, activePriceRange, apiBaseUrl]);
 
   // Get featured property (first active listing)
   const featuredProperty = activeListings.length > 0 ? activeListings[0] : null;
@@ -156,7 +165,7 @@ const AreaProfile = ({ apiBaseUrl }) => {
           <div className="text-red-600 text-xl mb-4">⚠️ Error</div>
           <p className="text-gray-600 mb-4">{error}</p>
           <button
-            onClick={fetchData}
+            onClick={() => fetchAreaData(areaId, activePriceRange, type)}
             className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
           >
             Retry

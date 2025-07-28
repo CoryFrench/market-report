@@ -10,13 +10,11 @@ const AreaNotFound = () => {
           The area profile you're looking for doesn't exist. Please check the URL and try again.
         </p>
         <div className="space-y-2">
-          <p className="text-sm text-gray-500">Available area profiles:</p>
-          <div className="text-sm text-blue-600 space-x-4">
-            <a href="/area-profile/jupiter" className="hover:underline">Jupiter</a>
-            <a href="/area-profile/juno-beach" className="hover:underline">Juno Beach</a>
-            <a href="/area-profile/singer-island" className="hover:underline">Singer Island</a>
-            <a href="/area-profile/admirals-cove" className="hover:underline">Admirals Cove</a>
-            <a href="/area-profile/center-street-canals" className="hover:underline">Center Street Canals</a>
+          <p className="text-sm text-gray-500">
+            Area profiles are dynamically generated from our database. Please check the URL format and try again.
+          </p>
+          <div className="text-sm text-gray-400">
+            Expected format: /area-profile/type/area-name (e.g., /area-profile/city/jupiter, /area-profile/region/river)
           </div>
         </div>
       </div>
